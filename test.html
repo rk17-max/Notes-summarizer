@@ -1,0 +1,407 @@
+//fhkv
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notes Helper Bot</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            color: #e2e8f0;
+        }
+        .chat-page {
+            width: 100%;
+            max-width: 420px;
+            height: 650px;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            box-shadow: 
+                0 25px 50px rgba(0, 0, 0, 0.5),
+                0 0 0 1px rgba(148, 163, 184, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+        .chat-header {
+            padding: 24px 28px 20px;
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            position: relative;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+        }
+        .header-gradient {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #0ea5e9, #3b82f6, #1d4ed8, #06b6d4);
+            background-size: 300% 100%;
+            animation: glossShift 4s ease infinite;
+        }
+        @keyframes glossShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+        .header-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #f8fafc;
+            margin-bottom: 4px;
+            text-align: center;
+        }
+        .header-subtitle {
+            font-size: 14px;
+            color: #94a3b8;
+            text-align: center;
+        }
+        .chat-close {
+            position: absolute;
+            right: 20px;
+            top: 24px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(71, 85, 105, 0.5);
+            width: 32px;
+            height: 32px;
+            border-radius: 16px;
+            color: #cbd5e1;
+            font-size: 18px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            transition: all 0.2s;
+        }
+        .chat-close:hover {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: #f87171;
+            color: #f8fafc;
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+        }
+        .chat-messages {
+            flex: 1;
+            padding: 24px 28px;
+            overflow-y: auto;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.03) 0%, transparent 100%);
+        }
+        .message {
+            margin-bottom: 20px;
+            display: flex;
+            opacity: 0;
+            animation: fadeInUp 0.4s forwards;
+        }
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .message.user {
+            justify-content: flex-end;
+        }
+        .message.bot {
+            justify-content: flex-start;
+        }
+        .message-content {
+            max-width: 75%;
+            padding: 14px 18px;
+            border-radius: 20px;
+            font-size: 15px;
+            line-height: 1.4;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            position: relative;
+        }
+        .user .message-content {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: #f8fafc;
+            border-bottom-right-radius: 4px;
+        }
+        .bot .message-content {
+            background: rgba(255, 255, 255, 0.08);
+            color: #e2e8f0;
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-bottom-left-radius: 4px;
+        }
+        .category-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 16px;
+        }
+        .category-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            padding: 12px 16px;
+            border-radius: 12px;
+            color: #e2e8f0;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+        .category-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+        .category-btn:hover::before {
+            left: 100%;
+        }
+        .category-btn:hover {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: #3b82f6;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+        }
+        .category-btn.selected {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            border-color: #60a5fa;
+        }
+        .file-zone {
+            margin: 12px 0;
+            padding: 16px;
+            border: 2px dashed rgba(59, 130, 246, 0.5);
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: rgba(59, 130, 246, 0.05);
+            color: #94a3b8;
+        }
+        .file-zone:hover {
+            border-color: #3b82f6;
+            background: rgba(59, 130, 246, 0.1);
+        }
+        .chat-input-container {
+            padding: 20px 28px 28px;
+            background: rgba(15, 23, 42, 0.8);
+            border-top: 1px solid rgba(148, 163, 184, 0.2);
+        }
+        .chat-input {
+            width: 100%;
+            padding: 14px 20px;
+            border: 1px solid rgba(71, 85, 105, 0.5);
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.06);
+            color: #f1f5f9;
+            font-size: 15px;
+            outline: none;
+            resize: none;
+            backdrop-filter: blur(10px);
+            transition: all 0.2s;
+        }
+        .chat-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+        .chat-input::placeholder {
+            color: #64748b;
+        }
+        #fileInput {
+            display: none;
+        }
+        .notes-list {
+            list-style: none;
+            margin: 8px 0;
+        }
+        .note-item {
+            background: rgba(59, 130, 246, 0.2);
+            margin: 6px 0;
+            padding: 10px 14px;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .note-item:hover {
+            background: rgba(59, 130, 246, 0.3);
+        }
+        .download-btn {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        /* Scrollbar */
+        .chat-messages::-webkit-scrollbar {
+            width: 4px;
+        }
+        .chat-messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.5);
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-page" id="chatPage">
+        <div class="chat-header">
+            <div class="header-gradient"></div>
+            <button class="chat-close" onclick="window.location.href='home.html'">×</button>
+            <div class="header-title">Notes Helper</div>
+            <div class="header-subtitle">How may I help you?</div>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+            <div class="message bot">
+                <div class="message-content">
+                    <strong>Please select the category which best describes your query:</strong>
+                    <div class="category-grid">
+                        <button class="category-btn" onclick="selectCategory('Upload Notes')">📁 Upload Notes</button>
+                        <button class="category-btn" onclick="selectCategory('Download Notes')">📥 Download Notes</button>
+                        <button class="category-btn" onclick="selectCategory('Common Questions')">❓ Common Questions</button>
+                        <button class="category-btn" onclick="selectCategory('Help')">🆘 Help</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="chat-input-container">
+            <input type="file" id="fileInput" accept=".pdf" style="display: none;">
+            <textarea class="chat-input" id="chatInput" placeholder="Type your message or select category above..." rows="1"></textarea>
+        </div>
+    </div>
+
+    <script>
+        const categories = {
+            'Upload Notes': 'Drop your PDF notes here or click to upload. I\'ll save them securely! 📄<div class="file-zone" onclick="document.getElementById(\'fileInput\').click()">📎 Click or drag PDF here</div>',
+            'Download Notes': 'Your saved notes:<ul class="notes-list" id="notesList"></ul>',
+            'Common Questions': 'Common queries:<br>- How to upload? Drag PDF<br>- How to download? Select from list<br>- Storage? Local browser only<br>Ask more! 💬',
+            'Help': 'Available:<br>• Upload/download PDFs<br>• Persistent storage<br>• Category selection<br>• Drag & drop support'
+        };
+
+        let notes = JSON.parse(localStorage.getItem('notes')) || [];
+        let currentCategory = '';
+
+        function closeChat() {
+            document.body.style.background = 'white';
+            document.body.innerHTML = '<p>Chat closed. <a href="">Reopen</a></p>'; // Simple close
+        }
+
+        function addMessage(text, isUser = false, delay = 0) {
+            setTimeout(() => {
+                const messages = document.getElementById('chatMessages');
+                const div = document.createElement('div');
+                div.className = `message ${isUser ? 'user' : 'bot'}`;
+                div.innerHTML = `<div class="message-content">${text}</div>`;
+                div.style.animationDelay = `${delay}ms`;
+                messages.appendChild(div);
+                messages.scrollTop = messages.scrollHeight;
+            }, delay);
+        }
+
+        function selectCategory(cat) {
+            currentCategory = cat;
+            document.querySelectorAll('.category-btn').forEach(btn => btn.classList.remove('selected'));
+            event.target.classList.add('selected');
+            const response = categories[cat];
+            
+            if (cat === 'Download Notes') {
+                showNotesList();
+            } else {
+                addMessage(response);
+            }
+        }
+
+        function showNotesList() {
+            if (notes.length === 0) {
+                addMessage('No notes saved yet. Upload first! 📝');
+                return;
+            }
+            let listHtml = notes.map((note, i) => 
+                `<li class="note-item" onclick="downloadNote(${i})">
+                    ${note.name}
+                    <button class="download-btn">Download</button>
+                </li>`
+            ).join('');
+            addMessage(`Saved notes (${notes.length}):<ul class="notes-list">${listHtml}</ul>`);
+        }
+
+        async function handleFileUpload(file) {
+            if (!file.type.includes('pdf')) {
+                addMessage('❌ PDF files only please!');
+                return;
+            }
+            const data = await file.arrayBuffer();
+            notes.unshift({ name: file.name, data });
+            localStorage.setItem('notes', JSON.stringify(notes.map(n => ({name: n.name}))));
+            addMessage(`✅ "${file.name}" uploaded! Size: ${(file.size/1024).toFixed(1)}KB`);
+        }
+
+        function downloadNote(index) {
+            const note = notes[index];
+            const blob = new Blob([note.data], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = note.name;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const msg = input.value.trim();
+            if (!msg) return;
+            addMessage(msg, true);
+            input.value = '';
+
+            // Simple responses
+            setTimeout(() => {
+                let response = 'Got it! Select a category or ask about notes. 📚';
+                const lower = msg.toLowerCase();
+                if (lower.includes('upload')) addMessage(categories['Upload Notes']);
+                else if (lower.includes('download')) showNotesList();
+                else addMessage(response);
+            }, 600);
+        }
+
+        // Events
+        document.getElementById('chatInput').addEventListener('keypress', e => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        document.getElementById('fileInput').addEventListener('change', e => {
+            if (e.target.files[0]) handleFileUpload(e.target.files[0]);
+        });
+
+        // Drag & drop on messages
+        const messages = document.getElementById('chatMessages');
+        messages.addEventListener('dragover', e => e.preventDefault());
+        messages.addEventListener('drop', e => {
+            e.preventDefault();
+            const files = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf');
+            if (files.length) handleFileUpload(files[0]);
+        });
+    </script>
+</body>
+</html>
