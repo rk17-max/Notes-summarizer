@@ -10,12 +10,13 @@ cloudinary.config({
 });
 
 
+// Replace your existing storage variable with this:
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'notes_app_uploads',
-    allowed_formats: ['pdf'],
-    
+    // 👇 ADDED IMAGE FORMATS HERE
+    allowed_formats: ['pdf', 'jpg', 'jpeg', 'png', 'webp'], 
     resource_type: 'auto' 
   }
 });
