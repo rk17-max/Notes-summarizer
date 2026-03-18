@@ -104,13 +104,29 @@ exports.summarizeFromUrl = async (req, res) => {
       writer.on('error', reject);
     });
 
-    console.log("2. Uploading to Gemini...");
+   console.log("2. Uploading to Gemini...");
+
+    // 👇 NEW LOGIC: Detect the file type from the URL
+    let detectedMimeType = "application/pdf"; // Default
+    const lowerUrl = fileUrl.toLowerCase();
+    
+    if (lowerUrl.endsWith(".jpg") || lowerUrl.endsWith(".jpeg")) {
+        detectedMimeType = "image/jpeg";
+    } else if (lowerUrl.endsWith(".png")) {
+        detectedMimeType = "image/png";
+    } else if (lowerUrl.endsWith(".webp")) {
+        detectedMimeType = "image/webp";
+    }
+
+    // 👇 UPDATED: Pass the dynamic mimeType
     const uploadResponse = await fileManager.uploadFile(tempFilePath, {
-      mimeType: "application/pdf",
+      mimeType: detectedMimeType, 
       displayName: "Remote Note",
     });
 
-    console.log("3. Generating Summary...");
+    console.log(`3. Generating Summary for ${detectedMimeType}...`);
+
+   
     const result = await model.generateContent([
       {
         fileData: {
