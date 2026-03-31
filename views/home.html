@@ -344,7 +344,7 @@
     let currentNoteData = null; 
     let allNotes = [];          // ⭐️ NEW: Stores all fetched notes
     let savedNotesIds = new Set(); // ⭐️ NEW: Stores IDs of saved notes
-
+    let currentUserId = null
     // --- 1. NAVIGATION ---
     function showView(viewName) {
         document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
@@ -449,18 +449,26 @@ function createNoteCard(note, isAlreadySaved = false, isSavedViewContext = false
     const courseBadge = note.course ? `<span class="badge course">${note.course}</span>` : '';
     const subject = note.subject || 'General';
 
-    // 🔴 Logic: If it's saved (either in Saved View OR marked as saved in Home), make it RED
     const isSaved = isAlreadySaved || isSavedViewContext;
-    
     const saveBtnText = isSaved ? "❤️ Saved" : "🤍 Save";
-    // If saved, use Red style. If not, use standard dark style.
     const saveBtnStyle = isSaved 
         ? "color:#f87171; background:rgba(239, 68, 68, 0.2);" 
         : "color:white; background:rgba(0,0,0,0.6);";
 
+    // 👇 NEW: Check if the logged-in user owns this note
+    const isOwner = currentUserId === note.userId; 
+    
+    // 👇 NEW: Only create the HTML for the delete button if they own it
+    const deleteBtnHtml = isOwner && !isSavedViewContext ? `
+        <button onclick="event.stopPropagation(); deleteNote('${note._id}')" 
+            style="position:absolute; top:10px; left:10px; border:none; padding:5px 10px; border-radius:15px; cursor:pointer; background:rgba(239, 68, 68, 0.9); color:white; font-size:0.8rem; backdrop-filter:blur(4px); transition:0.2s; z-index: 10;">
+            🗑️ Delete
+        </button>
+    ` : '';
+
     card.innerHTML = `
         <div style="position:relative;">
-            <img src="${thumb}" class="note-thumb" onerror="this.src='https://via.placeholder.com/300x150?text=PDF'">
+            ${deleteBtnHtml} <img src="${thumb}" class="note-thumb" onerror="this.src='https://via.placeholder.com/300x150?text=PDF'">
             <button onclick="event.stopPropagation(); toggleSave('${note._id}', this)" 
                 style="position:absolute; top:10px; right:10px; border:none; padding:5px 10px; border-radius:15px; cursor:pointer; font-size:0.8rem; backdrop-filter:blur(4px); transition:0.2s; ${saveBtnStyle}">
                 ${saveBtnText}
@@ -473,14 +481,12 @@ function createNoteCard(note, isAlreadySaved = false, isSavedViewContext = false
             <div class="card-footer">
                 <span class="note-date">${date}</span>
                 <span class="view-btn">View Note →</span>
-                
-<span class="view-btn" onclick="event.stopPropagation(); startQuiz('${note.fileUrl}')">🧠 Quiz Me</span>
+                <span class="view-btn" onclick="event.stopPropagation(); startQuiz('${note.fileUrl}')">🧠 Quiz Me</span>
             </div>
         </div>
     `;
     return card;
 }
-
     // --- 4. DATA FETCHING ---
     // --- UPDATED: FETCH NOTES ---
 // --- 4. DATA FETCHING & FILTERING ---
@@ -583,7 +589,29 @@ function createNoteCard(note, isAlreadySaved = false, isSavedViewContext = false
         }
     } catch (err) { console.error(err); }
 }
+// --- DELETE NOTE FUNCTION ---
+    async function deleteNote(noteId) {
+        if (!confirm("Are you sure you want to permanently delete this note?")) {
+            return;
+        }
 
+        try {
+            const res = await fetch(`/notes/${noteId}`, { method: 'DELETE' });
+            const data = await res.json();
+
+            if (data.success) {
+                // Remove the note from our global array
+                allNotes = allNotes.filter(n => n._id !== noteId);
+                // Redraw the grid without the deleted note
+                applyFilters(); 
+            } else {
+                alert("Error: " + data.error);
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Failed to connect to the server.");
+        }
+    }
     async function toggleSave(noteId, btnElement) {
         try {
             const res = await fetch(`/save/${noteId}`, { method: 'POST' });
@@ -670,6 +698,7 @@ function createNoteCard(note, isAlreadySaved = false, isSavedViewContext = false
             const data = await res.json();
             if (data.success) {
                 const u = data.user;
+                currentUserId = u._id;
                 document.getElementById('p-name').innerText = `${u.firstName} ${u.lastName}`;
                 document.getElementById('p-email').innerText = u.email;
                 document.getElementById('p-studentId').innerText = u.studentId || "N/A";
