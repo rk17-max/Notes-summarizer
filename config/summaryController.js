@@ -10,6 +10,75 @@ const fileManager = new GoogleAIFileManager(process.env.GEMINI_API_KEY);
 
 // ✅ USE THIS: It points to the stable, free-tier ready version
 const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+
+// Add this at the bottom of summaryController.js
+
+exports.generateQuizFromUrl = async (req, res) => {
+    let tempFilePath = null;
+    try {
+        const { fileUrl } = req.body;
+        if (!fileUrl) return res.status(400).json({ error: "No file URL provided" });
+
+        // 1. Detect File Type
+        let detectedMimeType = "application/pdf";
+        const lowerUrl = fileUrl.toLowerCase();
+        if (lowerUrl.endsWith(".jpg") || lowerUrl.endsWith(".jpeg")) detectedMimeType = "image/jpeg";
+        else if (lowerUrl.endsWith(".png")) detectedMimeType = "image/png";
+        else if (lowerUrl.endsWith(".webp")) detectedMimeType = "image/webp";
+
+        // 2. Download File to Temp Folder
+        const tempDir = os.tmpdir();
+        tempFilePath = path.join(tempDir, `quiz_${Date.now()}.pdf`);
+        const writer = fs.createWriteStream(tempFilePath);
+        const response = await axios({ url: fileUrl, method: 'GET', responseType: 'stream' });
+        response.data.pipe(writer);
+        await new Promise((resolve, reject) => { writer.on('finish', resolve); writer.on('error', reject); });
+
+        // 3. Upload to Gemini
+        console.log(`Uploading to Gemini for Quiz (${detectedMimeType})...`);
+        const uploadResponse = await fileManager.uploadFile(tempFilePath, {
+            mimeType: detectedMimeType,
+            displayName: "Quiz Source",
+        });
+
+        // 4. The Magic Prompt (Strict JSON formatting)
+        const prompt = `
+            Analyze this document and create a 3-question multiple-choice quiz testing the most important concepts.
+            Return ONLY a valid JSON array. Do not use markdown blocks like \`\`\`json. Just output the raw array.
+            Format exactly like this:
+            [
+              {
+                "question": "The question text here?",
+                "options": ["Choice A", "Choice B", "Choice C", "Choice D"],
+                "correctIndex": 2
+              }
+            ]
+        `;
+
+        const result = await model.generateContent([
+            { fileData: { mimeType: uploadResponse.file.mimeType, fileUri: uploadResponse.file.uri } },
+            { text: prompt }
+        ]);
+
+        // Cleanup temp file
+        if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+
+        // 5. Clean and Parse the JSON
+        const rawText = result.response.text();
+        // Just in case Gemini adds markdown anyway, strip it out:
+        const cleanJsonText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+        const quizData = JSON.parse(cleanJsonText);
+
+        res.json({ success: true, quiz: quizData });
+
+    } catch (err) {
+        console.error("Quiz Generation Error:", err);
+        if (tempFilePath && fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+        res.status(500).json({ error: "Failed to generate quiz" });
+    }
+};
+
+
 exports.summarizeUploadedFile = async (req, res) => {
   let tempFilePath = null;
 
