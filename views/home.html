@@ -27,6 +27,22 @@
             display: flex;
             flex-direction: column;
         }
+        .quiz-option {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            color: white;
+            text-align: left;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .quiz-option:hover { background: rgba(255,255,255,0.1); }
+        .quiz-option.correct { background: var(--success); border-color: var(--success); }
+        .quiz-option.wrong { background: var(--error); border-color: var(--error); }
         /* --- Toast Notification Styles --- */
         .notif-toast {
             position: fixed;
@@ -457,6 +473,8 @@ function createNoteCard(note, isAlreadySaved = false, isSavedViewContext = false
             <div class="card-footer">
                 <span class="note-date">${date}</span>
                 <span class="view-btn">View Note →</span>
+                
+<span class="view-btn" onclick="event.stopPropagation(); startQuiz('${note.fileUrl}')">🧠 Quiz Me</span>
             </div>
         </div>
     `;
@@ -664,6 +682,72 @@ function createNoteCard(note, isAlreadySaved = false, isSavedViewContext = false
     // Initialize
     loadProfile();
 </script>
+<script>
+    async function startQuiz(fileUrl) {
+        const modal = document.getElementById('quizModal');
+        const content = document.getElementById('quizContent');
+        
+        modal.style.display = 'flex';
+        content.innerHTML = '<div style="text-align:center; padding:40px;"><p style="font-size:1.2rem;">🤖 Gemini is reading your notes and crafting a quiz...</p><p style="opacity:0.6; margin-top:10px;">This usually takes 5-10 seconds.</p></div>';
 
+        try {
+            const res = await fetch('/generate-quiz', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fileUrl: fileUrl })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                content.innerHTML = ''; // Clear loader
+                
+                data.quiz.forEach((q, qIndex) => {
+                    const qDiv = document.createElement('div');
+                    qDiv.style.marginBottom = '25px';
+                    
+                    // Question Text
+                    qDiv.innerHTML = `<h3 style="margin-bottom:15px; font-size:1.1rem;">${qIndex + 1}. ${q.question}</h3>`;
+                    
+                    // Answer Options
+                    q.options.forEach((opt, optIndex) => {
+                        const btn = document.createElement('button');
+                        btn.className = 'quiz-option';
+                        btn.innerText = opt;
+                        
+                        btn.onclick = function() {
+                            // Disable all buttons in this question after guessing
+                            const siblings = qDiv.querySelectorAll('.quiz-option');
+                            siblings.forEach(b => b.style.pointerEvents = 'none');
+
+                            if (optIndex === q.correctIndex) {
+                                this.classList.add('correct');
+                                this.innerText += " ✅ Correct!";
+                            } else {
+                                this.classList.add('wrong');
+                                this.innerText += " ❌ Incorrect";
+                                // Show the correct answer
+                                siblings[q.correctIndex].classList.add('correct');
+                            }
+                        };
+                        qDiv.appendChild(btn);
+                    });
+                    content.appendChild(qDiv);
+                });
+            } else {
+                content.innerHTML = `<p style="color:var(--error);">Error generating quiz: ${data.error}</p>`;
+            }
+        } catch (err) {
+            content.innerHTML = `<p style="color:var(--error);">Failed to connect to the AI server.</p>`;
+        }
+    }
+</script>
+<div id="quizModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:10000; justify-content:center; align-items:center;">
+        <div style="background:var(--bg-card); width:90%; max-width:600px; border-radius:15px; padding:30px; position:relative; max-height:80vh; overflow-y:auto;">
+            <button onclick="document.getElementById('quizModal').style.display='none'" style="position:absolute; top:15px; right:15px; background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;">✖</button>
+            <h2 style="margin-bottom: 20px; color: var(--primary);">🧠 AI Knowledge Check</h2>
+            <div id="quizContent">
+                </div>
+        </div>
+    </div>
 </body>
 </html>
