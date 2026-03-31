@@ -27,6 +27,30 @@
             display: flex;
             flex-direction: column;
         }
+        /* --- Toast Notification Styles --- */
+        .notif-toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: var(--primary); /* Uses your existing purple/indigo color */
+            color: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 500;
+            transform: translateX(150%);
+            animation: slideInToast 0.5s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transition: transform 0.4s ease-in;
+        }
+
+        @keyframes slideInToast {
+            from { transform: translateX(150%); }
+            to { transform: translateX(0); }
+        }
 
         /* --- NAVBAR --- */
         .navbar {
@@ -148,10 +172,11 @@
     <nav class="navbar">
         <div class="logo">Note<span>AI</span></div>
         <div class="nav-links">
-            <a onclick="showView('home')" class="nav-item active" id="nav-home">Home</a>
-            <a onclick="showView('notes')" class="nav-item" id="nav-notes">Notes Section</a>
-            <a onclick="showView('profile')" class="nav-item" id="nav-profile">Profile</a>
-        </div>
+    <a onclick="showView('home')" class="nav-item active" id="nav-home">Home</a>
+    <a onclick="showView('notes')" class="nav-item" id="nav-notes">Notes section</a>
+    <a onclick="showView('saved')" class="nav-item" id="nav-saved">Saved Notes</a> 
+    <a onclick="showView('profile')" class="nav-item" id="nav-profile">Profile</a>
+</div>
         <div class="profile-icon">?</div>
     </nav>
 
@@ -191,18 +216,41 @@
                 <div style="font-size: 3rem; margin-bottom: 1rem;">📄</div>
                 <h3>Click to Upload PDF</h3>
                 <p style="font-size: 0.8rem; color: var(--text-muted);">Max size 10MB</p>
-                <input type="file" id="fileInput" accept="application/pdf" hidden onchange="handleFileSelect(this)">
+               <input type="file" id="fileInput" accept=".pdf, image/png, image/jpeg, image/jpg, image/webp" style="display: none;" onchange="handleFileSelect(this)">
             </div>
         </div>
     </section>
 
-    <section id="notes-view" class="view-section">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <h2>Your Library</h2>
-            <button onclick="showView('home')" style="font-size:0.9rem; color:var(--primary); background:none; border:none; cursor:pointer;">+ New Upload</button>
+    <section id="notes-view" class="view-section active">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h2>My Uploads 📝</h2>
+        <button class="btn-primary" onclick="document.getElementById('fileInput').click()">+ New Note</button>
+    </div>
+
+    <div class="controls-bar" style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+        <input type="text" id="searchInput" placeholder="🔍 Search notes by title..." onkeyup="applyFilters()" 
+               style="flex: 1; min-width: 200px; padding: 10px 15px; border-radius: 8px; background: var(--bg-card); color: white; border: 1px solid rgba(255,255,255,0.1); outline: none;">
+        
+        <select id="subjectFilter" onchange="applyFilters()" 
+                style="padding: 10px 15px; border-radius: 8px; background: var(--bg-card); color: white; border: 1px solid rgba(255,255,255,0.1); outline: none; cursor: pointer;">
+            <option value="">All Subjects</option>
+        </select>
+        
+        <select id="courseFilter" onchange="applyFilters()" 
+                style="padding: 10px 15px; border-radius: 8px; background: var(--bg-card); color: white; border: 1px solid rgba(255,255,255,0.1); outline: none; cursor: pointer;">
+            <option value="">All Courses</option>
+        </select>
+    </div>
+
+    <div class="notes-grid" id="notesGrid">
         </div>
-        <div class="notes-grid" id="notesGrid">
-            <p style="color:var(--text-muted);">Loading notes...</p>
+</section>
+    </section> 
+
+    <section id="saved-view" class="view-section">
+        <h2>My Saved Collection 📚</h2>
+        <div class="notes-grid" id="savedGrid">
+            <p style="color:var(--text-muted);">Loading saved notes...</p>
         </div>
     </section>
 
@@ -245,11 +293,43 @@
             </div>
         </div>
     </section>
+    <script src="/socket.io/socket.io.js"></script>
 
 <script>
-    let selectedFile = null;
+    // --- GLOBAL VARIABLES ---
+    // --- GLOBAL VARIABLES ---
+    // --- SOCKET.IO LISTENER ---
+    const socket = io();
 
-    
+    socket.on('new-note-notification', (data) => {
+        // 1. Create the toast element
+        const toast = document.createElement('div');
+        toast.className = 'notif-toast';
+        
+        // 2. Set the content using the data from the server
+        toast.innerHTML = `
+            <span style="font-size: 1.5rem;">🔔</span>
+            <div>
+                <div style="font-size: 0.85rem; opacity: 0.8;">New Upload at ${data.time}</div>
+                <div><strong>${data.userName}</strong> uploaded <em>"${data.noteTitle}"</em></div>
+            </div>
+        `;
+        
+        // 3. Add it to the screen
+        document.body.appendChild(toast);
+        
+        // 4. Slide it away and remove it after 5 seconds
+        setTimeout(() => { 
+            toast.style.transform = 'translateX(150%)'; 
+            setTimeout(() => toast.remove(), 400); // Wait for the slide animation to finish
+        }, 5000);
+    });
+    let selectedFile = null;
+    let currentNoteData = null; 
+    let allNotes = [];          // ⭐️ NEW: Stores all fetched notes
+    let savedNotesIds = new Set(); // ⭐️ NEW: Stores IDs of saved notes
+
+    // --- 1. NAVIGATION ---
     function showView(viewName) {
         document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -258,7 +338,8 @@
         const navLink = document.getElementById('nav-' + viewName);
         if (navLink) navLink.classList.add('active');
 
-        if (viewName === 'notes') fetchNotes(); // Refresh notes when clicking tab
+        if (viewName === 'notes') fetchNotes();
+        if (viewName === 'saved') fetchSavedNotes();
         if (viewName === 'profile') loadProfile();
     }
 
@@ -267,13 +348,13 @@
         if (input.files && input.files[0]) {
             selectedFile = input.files[0];
             document.getElementById('fileNameDisplay').innerText = "Selected: " + selectedFile.name;
-            document.getElementById('uploadModal').style.display = 'flex'; // Show modal
+            document.getElementById('uploadModal').style.display = 'flex'; 
         }
     }
 
     function closeModal() {
         document.getElementById('uploadModal').style.display = 'none';
-        document.getElementById('fileInput').value = ""; // Reset input
+        document.getElementById('fileInput').value = ""; 
     }
 
     async function submitUpload() {
@@ -297,7 +378,7 @@
             if (data.success) {
                 alert("Upload Successful!");
                 closeModal();
-                showView('notes'); // Go to notes page
+                showView('notes'); 
             } else {
                 alert("Upload Failed: " + (data.error || "Unknown error"));
             }
@@ -310,112 +391,225 @@
         }
     }
 
-    
-    function getThumbnailUrl(pdfUrl) {
-        if (!pdfUrl) return 'https://via.placeholder.com/300x150?text=No+Preview';
+    // --- 3. HELPER FUNCTIONS ---
+    // function getThumbnailUrl(pdfUrl) {
+    //     if (!pdfUrl) return 'https://via.placeholder.com/300x150?text=No+Preview';
+    //     let thumbUrl = pdfUrl;
+    //     if (thumbUrl.includes('cloudinary.com')) {
+    //         thumbUrl = thumbUrl.replace('/upload/', '/upload/w_400,pg_1/');
+    //         thumbUrl = thumbUrl.replace('.pdf', '.jpg');
+    //         thumbUrl = thumbUrl.replace('/raw/', '/image/');
+    //     }
+    //     return thumbUrl;
+    // }
+
+    function getThumbnailUrl(fileUrl) {
+        if (!fileUrl) return 'https://via.placeholder.com/300x150?text=No+Preview';
         
-      
-        let thumbUrl = pdfUrl;
+        let thumbUrl = fileUrl;
         
         if (thumbUrl.includes('cloudinary.com')) {
-           
-            thumbUrl = thumbUrl.replace('/upload/', '/upload/w_400,pg_1/');
-            
-            
-            thumbUrl = thumbUrl.replace('.pdf', '.jpg');
-            
-            
-            thumbUrl = thumbUrl.replace('/raw/', '/image/');
+            // Check if it's a PDF
+            if (thumbUrl.toLowerCase().endsWith('.pdf')) {
+                thumbUrl = thumbUrl.replace('/upload/', '/upload/w_400,pg_1/');
+                thumbUrl = thumbUrl.replace('.pdf', '.jpg');
+            } else {
+                // If it's an image, just resize it to save bandwidth
+                thumbUrl = thumbUrl.replace('/upload/', '/upload/w_400,c_scale/');
+            }
         }
-        
         return thumbUrl;
     }
 
+    // --- UPDATED HELPER: CREATE CARD ---
+function createNoteCard(note, isAlreadySaved = false, isSavedViewContext = false) {
+    const date = new Date(note.createdAt).toLocaleDateString();
+    const thumb = getThumbnailUrl(note.fileUrl); 
+    
+    const card = document.createElement('div');
+    card.className = 'note-card';
+    card.onclick = () => openPreview(note);
+
+    const courseBadge = note.course ? `<span class="badge course">${note.course}</span>` : '';
+    const subject = note.subject || 'General';
+
+    // 🔴 Logic: If it's saved (either in Saved View OR marked as saved in Home), make it RED
+    const isSaved = isAlreadySaved || isSavedViewContext;
+    
+    const saveBtnText = isSaved ? "❤️ Saved" : "🤍 Save";
+    // If saved, use Red style. If not, use standard dark style.
+    const saveBtnStyle = isSaved 
+        ? "color:#f87171; background:rgba(239, 68, 68, 0.2);" 
+        : "color:white; background:rgba(0,0,0,0.6);";
+
+    card.innerHTML = `
+        <div style="position:relative;">
+            <img src="${thumb}" class="note-thumb" onerror="this.src='https://via.placeholder.com/300x150?text=PDF'">
+            <button onclick="event.stopPropagation(); toggleSave('${note._id}', this)" 
+                style="position:absolute; top:10px; right:10px; border:none; padding:5px 10px; border-radius:15px; cursor:pointer; font-size:0.8rem; backdrop-filter:blur(4px); transition:0.2s; ${saveBtnStyle}">
+                ${saveBtnText}
+            </button>
+        </div>
+        
+        <div class="card-content">
+            <div class="card-header"><div class="note-title">${note.title}</div></div>
+            <div class="badges"><span class="badge">${subject}</span>${courseBadge}</div>
+            <div class="card-footer">
+                <span class="note-date">${date}</span>
+                <span class="view-btn">View Note →</span>
+            </div>
+        </div>
+    `;
+    return card;
+}
+
+    // --- 4. DATA FETCHING ---
+    // --- UPDATED: FETCH NOTES ---
+// --- 4. DATA FETCHING & FILTERING ---
+    
+    // 1. Fetch Notes (Updated to save data globally)
     async function fetchNotes() {
         const grid = document.getElementById('notesGrid');
+        grid.innerHTML = '<p>Loading notes...</p>';
+        
         try {
+            // A. Get Saved IDs first (for the red heart logic)
+            const savedRes = await fetch('/saved-notes');
+            const savedData = await savedRes.json();
+            savedNotesIds.clear();
+            if (savedData.success) {
+                savedData.notes.forEach(note => savedNotesIds.add(note._id));
+            }
+
+            // B. Get all notes
             const res = await fetch('/notes'); 
             const data = await res.json();
 
             if (data.success && Array.isArray(data.notes) && data.notes.length > 0) {
-                grid.innerHTML = ""; 
-                data.notes.forEach(note => {
-                    const date = new Date(note.createdAt).toLocaleDateString();
-                    const thumb = getThumbnailUrl(note.fileUrl); // <--- GENERATE THUMBNAIL
-
-                    const card = document.createElement('div');
-                    card.className = 'note-card';
-                    card.onclick = () => openPreview(note); 
-                    
-                    const courseBadge = note.course ? `<span class="badge course">${note.course}</span>` : '';
-                    const subject = note.subject || 'General';
-
-                    // 👇 NEW CARD HTML WITH IMAGE ON TOP
-                    card.innerHTML = `
-                        <img src="${thumb}" class="note-thumb" alt="Note Preview" onerror="this.src='https://via.placeholder.com/300x150?text=PDF'">
-                        
-                        <div class="card-content">
-                            <div class="card-header">
-                                <div class="note-title">${note.title}</div>
-                            </div>
-                            <div class="badges">
-                                <span class="badge">${subject}</span>
-                                ${courseBadge}
-                            </div>
-                            <p class="note-desc">${note.description}</p>
-                            <div class="card-footer">
-                                <span class="note-date">${date}</span>
-                                <span class="view-btn">View Note →</span>
-                            </div>
-                        </div>
-                    `;
-                    grid.appendChild(card);
-                });
+                allNotes = data.notes; // Store them in our global variable
+                populateFilterDropdowns(); // Fill the Subject/Course dropdowns dynamically
+                applyFilters(); // Draw the cards on the screen
             } else {
                 grid.innerHTML = "<p>No notes found. Upload one!</p>";
+                allNotes = [];
             }
-        } catch (err) {
-            console.error("Error fetching notes:", err);
+        } catch (err) { console.error("Error fetching notes:", err); }
+    }
+
+    // 2. Populate Dropdowns dynamically based on user's actual tags
+    function populateFilterDropdowns() {
+        const subjectSelect = document.getElementById('subjectFilter');
+        const courseSelect = document.getElementById('courseFilter');
+        
+        // Extract unique subjects and courses using Sets
+        const subjects = [...new Set(allNotes.map(n => n.subject).filter(Boolean))];
+        const courses = [...new Set(allNotes.map(n => n.course).filter(Boolean))];
+
+        // Reset dropdowns
+        subjectSelect.innerHTML = '<option value="">All Subjects</option>';
+        courseSelect.innerHTML = '<option value="">All Courses</option>';
+
+        // Add options
+        subjects.forEach(s => subjectSelect.innerHTML += `<option value="${s}">${s}</option>`);
+        courses.forEach(c => courseSelect.innerHTML += `<option value="${c}">${c}</option>`);
+    }
+
+    // 3. Apply Filters and Render
+    function applyFilters() {
+        const grid = document.getElementById('notesGrid');
+        
+        // Read current values from the UI
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        const subjectVal = document.getElementById('subjectFilter').value;
+        const courseVal = document.getElementById('courseFilter').value;
+
+        grid.innerHTML = ''; // Clear current grid
+
+        // Filter the global array
+        const filteredNotes = allNotes.filter(note => {
+            // Check if title includes search term
+            const matchSearch = note.title.toLowerCase().includes(searchTerm);
+            // Check if subject matches (or if 'All Subjects' is selected)
+            const matchSubject = subjectVal === "" || note.subject === subjectVal;
+            // Check if course matches (or if 'All Courses' is selected)
+            const matchCourse = courseVal === "" || note.course === courseVal;
+            
+            return matchSearch && matchSubject && matchCourse;
+        });
+
+        // Render the filtered results
+        if (filteredNotes.length > 0) {
+            filteredNotes.forEach(note => {
+                const isSaved = savedNotesIds.has(note._id);
+                grid.appendChild(createNoteCard(note, isSaved, false));
+            });
+        } else {
+            grid.innerHTML = "<p style='color:var(--text-muted);'>No notes match your filters.</p>";
         }
     }
-    
-    
-    // 1. Add this variable at the very top of your script
-    let currentNoteData = null; 
 
-    // ... (existing showView, handleFileSelect, etc.) ...
+    async function fetchSavedNotes() {
+    const grid = document.getElementById('savedGrid');
+    grid.innerHTML = '<p>Loading...</p>';
+    try {
+        const res = await fetch('/saved-notes');
+        const data = await res.json();
+        if (data.success && data.notes.length > 0) {
+            grid.innerHTML = ""; 
+            data.notes.forEach(note => {
+                // TRUE for saved, TRUE for savedViewContext
+                grid.appendChild(createNoteCard(note, true, true));
+            });
+        } else {
+            grid.innerHTML = "<p>No saved notes yet. Go explore!</p>";
+        }
+    } catch (err) { console.error(err); }
+}
 
-    // 2. REPLACE your existing openPreview function with this:
+    async function toggleSave(noteId, btnElement) {
+        try {
+            const res = await fetch(`/save/${noteId}`, { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                if (data.isSaved) {
+                    btnElement.innerText = "❤️ Saved";
+                    btnElement.style.background = "rgba(239, 68, 68, 0.2)";
+                    btnElement.style.color = "#f87171";
+                } else {
+                    btnElement.innerText = "🤍 Save";
+                    btnElement.style.background = "rgba(0,0,0,0.6)";
+                    btnElement.style.color = "white";
+                    if(document.getElementById('saved-view').classList.contains('active')) {
+                        btnElement.closest('.note-card').remove();
+                    }
+                }
+            }
+        } catch (err) { alert("Error saving note"); }
+    }
+    
+    // --- 5. PREVIEW & AI SUMMARY ---
     function openPreview(note) {
-        currentNoteData = note; // Save note data for the API call
-        
+        currentNoteData = note; 
         document.getElementById('previewTitle').innerText = note.title;
         document.getElementById('previewDate').innerText = new Date(note.createdAt).toDateString();
         document.getElementById('downloadLink').href = note.fileUrl;
         
-        // Reset the summary panel UI
         const summaryContent = document.getElementById('summaryContent');
         const summaryBtn = document.getElementById('summaryBtn');
         
-        if(summaryContent) {
-            summaryContent.innerHTML = '<p style="color:var(--text-muted); font-style:italic;">Click the button below to generate a study summary.</p>';
-        }
+        if(summaryContent) summaryContent.innerHTML = '<p style="color:var(--text-muted); font-style:italic;">Click the button below to generate a study summary.</p>';
         if(summaryBtn) {
             summaryBtn.disabled = false;
             summaryBtn.innerText = "✨ Generate Summary";
         }
-        
         showView('preview');
     }
 
-    // 3. ADD this new function for the API call
     async function requestSummary() {
         if (!currentNoteData) return;
-
         const summaryContent = document.getElementById('summaryContent');
         const btn = document.getElementById('summaryBtn');
 
-        // Show Loading State
         btn.innerText = "Thinking...";
         btn.disabled = true;
         summaryContent.innerHTML = `
@@ -431,15 +625,11 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ fileUrl: currentNoteData.fileUrl })
             });
-
             const data = await res.json();
-
             if (data.success) {
-                // Format the text (convert markdown bold to HTML)
                 const formattedSummary = data.summary
                     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                     .replace(/\n/g, '<br>');
-
                 summaryContent.innerHTML = formattedSummary;
                 btn.innerText = "✨ Regenerate";
             } else {
@@ -455,7 +645,7 @@
         }
     }
 
-    // --- 5. PROFILE ---
+    // --- 6. PROFILE ---
     async function loadProfile() {
         try {
             const res = await fetch('/profile');
