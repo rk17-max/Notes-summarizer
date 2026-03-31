@@ -4,7 +4,8 @@ const { Server } = require('socket.io');
 const path = require("path");
 const bcrypt = require('bcrypt');
 const emailValidator = require("email-validator");
-const { storage } = require('./config/cloudinary');
+
+const { storage, cloudinary } = require('./config/cloudinary');
 const multer = require('multer');
 const upload = multer({ storage });
 const saltRounds = 10;
@@ -204,6 +205,54 @@ app.post('/upload',auth, upload.single('pdf'), async (req, res) => {
   }
 });
 
+// 👇 ADD THIS SECURE DELETE ROUTE
+app.delete("/notes/:id", auth, async (req, res) => {
+    try {
+        const noteId = req.params.id;
+        const noteToDelete = await Note.findById(noteId);
+        
+        if (!noteToDelete) {
+            return res.status(404).json({ success: false, error: "Note not found" });
+        }
+
+        // 🔒 SECURITY VALIDATION: Is the user deleting it the one who uploaded it?
+        if (noteToDelete.userId.toString() !== req.user.id) {
+            return res.status(403).json({ success: false, error: "Unauthorized: You can only delete your own notes." });
+        }
+
+        // 1. Delete from Cloudinary
+        try {
+            if (noteToDelete.publicId) {
+                await cloudinary.uploader.destroy(noteToDelete.publicId);
+                console.log ("notes deleted from cloudinary")
+            } else if (noteToDelete.fileUrl && noteToDelete.fileUrl.includes('cloudinary.com')) {
+                const urlParts = noteToDelete.fileUrl.split('/upload/');
+                if (urlParts.length === 2) {
+                    let publicIdPart = urlParts[1].replace(/^v\d+\//, '');
+                    const publicId = publicIdPart.substring(0, publicIdPart.lastIndexOf('.'));
+                    await cloudinary.uploader.destroy(publicId);
+                }
+            }
+        } catch (cloudErr) {
+            console.error("Cloudinary Deletion Error:", cloudErr);
+        }
+
+        // 2. Delete from MongoDB
+        await Note.findByIdAndDelete(noteId);
+
+        // 3. Cleanup: Remove from everyone's saved collections
+        await User.updateMany(
+            { savedNotes: noteId },
+            { $pull: { savedNotes: noteId } }
+        );
+
+        res.json({ success: true, message: "Note deleted successfully" });
+    } catch (err) {
+        console.error("Delete Error:", err);
+        res.status(500).json({ success: false, error: "Server Error" });
+    }
+});
+
 app.get("/notes", auth, async (req, res) => {
     try {
         // 👇 CHANGED: Removed the userId filter. An empty object {} means "Find Everything"
@@ -223,7 +272,7 @@ app.post('/profile',auth, upload.single('avatar'), function (req, res, next) {
 })
 app.post("/summarize",  upload.single("pdf"), summaryController.summarizeUploadedFile);
 app.post("/summarize-url", auth, summaryController.summarizeFromUrl);
-
+app.post("/generate-quiz", auth, summaryController.generateQuizFromUrl);
 app.post("/save/:noteId", auth, async (req, res) => {
     try {
         const user = await User.findById(req.user.id);
