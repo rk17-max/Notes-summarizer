@@ -1,13 +1,14 @@
-const mongoose=require("mongoose");
-const MONGO_URL="mongodb://localhost:27017/Notes";
+require("dotenv").config();
+const mongoose = require("mongoose");
 
-const databaseconnect=()=>{
-    mongoose.connect(MONGO_URL,{
-
-    }).then(()=>{
+const databaseconnect = async () => {
+    try {
+        // 👇 This safely pulls the URL from your .env file locally, or from Render in production
+        await mongoose.connect(process.env.MONGO_URI);
         console.log("database connected");
-    }).catch((err)=>{
-        console.log(err);
-    })
+    } catch (err) {
+        console.log("Database connection error:", err);
+    }
 }
-module.exports=databaseconnect;
+
+module.exports = databaseconnect;
