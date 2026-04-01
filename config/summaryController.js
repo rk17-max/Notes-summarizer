@@ -114,6 +114,35 @@ exports.summarizeUploadedFile = async (req, res) => {
     });
 
     // Generate Summary
+    console.log(`3. Generating Summary for ${detectedMimeType}...`);
+
+    // 👇 YOUR NEW CODE STARTS HERE 👇
+    const superPrompt = `
+      You are an expert academic tutor and professor. Your task is to analyze the provided student notes (which may be images of handwritten notes, diagrams, or PDFs) and create a highly structured, comprehensive, and easy-to-read study guide summary.
+
+      Please extract the information and format it EXACTLY using the following Markdown structure:
+
+      ## 🎯 Core Topic
+      [Provide a clear, 1-line title for what these notes are about]
+
+      ## 📝 Executive Summary
+      [Provide a 2-3 sentence overview of the main theme and why it is important]
+
+      ## 🔑 Key Concepts & Definitions
+      [Extract the most important terms. Use bullet points. Bold the term, followed by a clear definition]
+
+      ## ⚙️ Important Processes / Formulas / Facts
+      [If there are mathematical formulas, algorithms, or step-by-step processes, list them clearly here. If it's a history/literature note, list the crucial historical events. Use bullet points or numbered lists.]
+
+      ## 💡 Crucial Takeaways for Exams
+      [Provide 3 to 5 high-yield bullet points summarizing the most testable or essential information that a student MUST remember from this document.]
+
+      Strict Guidelines:
+      1. Use clean Markdown formatting (bolding, headers, bullet points).
+      2. If the document is an image of messy handwritten notes, transcribe and interpret it to the best of your ability.
+      3. DO NOT hallucinate or make up information that is not present in the document. If a section from the template above doesn't apply (e.g., no formulas), simply omit that section.
+    `;
+
     const result = await model.generateContent([
       {
         fileData: {
@@ -121,8 +150,12 @@ exports.summarizeUploadedFile = async (req, res) => {
           fileUri: uploadResponse.file.uri
         }
       },
-      { text: "Detailed summary please." }
+      { text: superPrompt } 
     ]);
+    // 👆 YOUR NEW CODE ENDS HERE 👆
+
+    // Cleanup
+    if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
 
     // Cleanup
     if (fs.existsSync(tempFilePath)) {
