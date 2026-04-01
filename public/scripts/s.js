@@ -1,137 +1,170 @@
+document.addEventListener('DOMContentLoaded', () => {
+  const socket = io();
+  let selectedFile = null;
+  let currentNoteData = null;
+  let allNotes = [];
+  let noteDirectory = {}; 
+  let currentUserId = null;
+  
+  // 📝 Setup Quill Rich Text Editor
+  let quill = new Quill('#quillEditor', {
+      theme: 'snow',
+      placeholder: 'Type your quick notes here...'
+  });
+  let uploadMode = 'file'; // 'file' or 'text'
 
-    // --- GLOBAL VARIABLES ---
-    // --- GLOBAL VARIABLES ---
-    // --- SOCKET.IO LISTENER ---
-    const socket = io();
+  // ☀️ Dark/Light Mode Theme Logic
+  window.toggleTheme = function() {
+      document.body.classList.toggle('light-mode');
+      const isLight = document.body.classList.contains('light-mode');
+      localStorage.setItem('theme', isLight ? 'light' : 'dark');
+      document.getElementById('themeToggle').innerText = isLight ? '🌙' : '☀️';
+  };
+  if (localStorage.getItem('theme') === 'light') toggleTheme();
 
-    socket.on('new-note-notification', (data) => {
-        // 1. Create the toast element
-        const toast = document.createElement('div');
-        toast.className = 'notif-toast';
-        
-        // 2. Set the content using the data from the server
-        toast.innerHTML = `
-            <span style="font-size: 1.5rem;">🔔</span>
-            <div>
-                <div style="font-size: 0.85rem; opacity: 0.8;">New Upload at ${data.time}</div>
-                <div><strong>${data.userName}</strong> uploaded <em>"${data.noteTitle}"</em></div>
-            </div>
-        `;
-        
-        // 3. Add it to the screen
-        document.body.appendChild(toast);
-        
-        // 4. Slide it away and remove it after 5 seconds
-        setTimeout(() => { 
-            toast.style.transform = 'translateX(150%)'; 
-            setTimeout(() => toast.remove(), 400); // Wait for the slide animation to finish
-        }, 5000);
-    });
-    let selectedFile = null;
-    let currentNoteData = null; 
-    let allNotes = [];          // ⭐️ NEW: Stores all fetched notes
-    let savedNotesIds = new Set(); // ⭐️ NEW: Stores IDs of saved notes
-    let currentUserId = null
-    // --- 1. NAVIGATION ---
-    function showView(viewName) {
-        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
-        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        
-        document.getElementById(viewName + '-view').classList.add('active');
-        const navLink = document.getElementById('nav-' + viewName);
-        if (navLink) navLink.classList.add('active');
+  // ⚡ LIVE NOTIFICATION TOASTS
+  socket.on('new-note-notification', data => {
+    const toast = document.createElement('div');
+    toast.className = 'notif-toast';
+    toast.innerHTML = `
+      <span style="font-size:1.5rem;">🔔</span>
+      <div><strong>${data.userName}</strong> uploaded <em>"${data.noteTitle}"</em><br>
+      <small>${data.time}</small></div>`;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+      toast.style.transform = 'translateX(150%)';
+      setTimeout(() => toast.remove(), 400);
+    }, 5000);
+  });
 
-        if (viewName === 'notes') fetchNotes();
-        if (viewName === 'saved') fetchSavedNotes();
-        if (viewName === 'profile') loadProfile();
+  // 🔄 VIEW SWITCHER
+  window.showView = function (viewName) {
+    document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    const section = document.getElementById(`${viewName}-view`);
+    const nav = document.getElementById(`nav-${viewName}`);
+    if (section) section.classList.add('active');
+    if (nav) nav.classList.add('active');
+    if (viewName === 'notes') fetchNotes();
+    if (viewName === 'saved') fetchSavedNotes();
+    if (viewName === 'profile') loadProfile();
+  };
+
+  // 📁 FILE/TEXT UPLOAD LOGIC
+  window.switchUploadMode = function(mode) {
+      uploadMode = mode;
+      if(mode === 'file') {
+          document.getElementById('fileUploadSection').style.display = 'block';
+          document.getElementById('textUploadSection').style.display = 'none';
+          document.getElementById('btnModeFile').style.background = 'var(--primary)';
+          document.getElementById('btnModeFile').style.color = 'white';
+          document.getElementById('btnModeText').style.background = 'rgba(255,255,255,0.1)';
+          document.getElementById('btnModeText').style.color = 'var(--text-muted)';
+      } else {
+          document.getElementById('fileUploadSection').style.display = 'none';
+          document.getElementById('textUploadSection').style.display = 'block';
+          document.getElementById('btnModeText').style.background = 'var(--primary)';
+          document.getElementById('btnModeText').style.color = 'white';
+          document.getElementById('btnModeFile').style.background = 'rgba(255,255,255,0.1)';
+          document.getElementById('btnModeFile').style.color = 'var(--text-muted)';
+      }
+  };
+
+  window.handleFileSelect = function (input) {
+    if (input.files?.[0]) {
+      selectedFile = input.files[0];
+      document.getElementById('fileNameDisplay').innerText = `Selected: ${selectedFile.name}`;
+      document.getElementById('uploadModal').style.display = 'flex';
     }
+  };
 
-    // --- 2. UPLOAD FLOW ---
-    function handleFileSelect(input) {
-        if (input.files && input.files[0]) {
-            selectedFile = input.files[0];
-            document.getElementById('fileNameDisplay').innerText = "Selected: " + selectedFile.name;
-            document.getElementById('uploadModal').style.display = 'flex'; 
+  window.closeModal = function () {
+    document.getElementById('uploadModal').style.display = 'none';
+    selectedFile = null;
+    document.getElementById('fileNameDisplay').innerText = '';
+    quill.setText(''); 
+  };
+
+ window.submitUpload = async function () {
+    if (uploadMode === 'file' && !selectedFile) return alert('Please select a PDF or Image.');
+    if (uploadMode === 'text' && quill.getText().trim().length === 0) return alert('Please write some text.');
+
+    const btn = document.getElementById('uploadBtn');
+    btn.innerText = 'Processing...';
+    btn.disabled = true;
+
+    const formData = new FormData();
+    // 📝 Ensure all these IDs match your HTML inputs!
+    formData.append('title', document.getElementById('u-title').value || 'Untitled Note');
+    formData.append('description', document.getElementById('u-desc').value || 'No description provided');
+    formData.append('subject', document.getElementById('u-subject').value || 'General');
+    formData.append('course', document.getElementById('u-course').value || '');
+
+    try {
+        if (uploadMode === 'file') {
+            formData.append('pdf', selectedFile);
+            await sendFormData(formData);
+        } else {
+            const element = quill.root.innerHTML;
+            const opt = { 
+                margin: 0.5, 
+                filename: 'quick-note.pdf', 
+                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } 
+            };
+            
+            html2pdf().set(opt).from(element).outputPdf('blob').then(async (pdfBlob) => {
+                formData.append('pdf', pdfBlob, 'quick-note.pdf');
+                await sendFormData(formData);
+            });
         }
+    } catch (err) {
+        console.error(err);
+        alert('Error preparing upload');
+        btn.innerText = '🚀 Save Note';
+        btn.disabled = false;
     }
-
-    function closeModal() {
-        document.getElementById('uploadModal').style.display = 'none';
-        document.getElementById('fileInput').value = ""; 
-    }
-
-    async function submitUpload() {
-        if (!selectedFile) return;
-
-        const btn = document.getElementById('uploadBtn');
-        btn.innerText = "Uploading...";
-        btn.disabled = true;
-
-        const formData = new FormData();
-        formData.append('pdf', selectedFile);
-        formData.append('title', document.getElementById('u-title').value);
-        formData.append('description', document.getElementById('u-desc').value);
-        formData.append('subject', document.getElementById('u-subject').value);
-        formData.append('course', document.getElementById('u-course').value);
-
-        try {
-            const res = await fetch('/upload', { method: 'POST', body: formData });
-            const data = await res.json();
-
-            if (data.success) {
-                alert("Upload Successful!");
-                closeModal();
-                showView('notes'); 
-            } else {
-                alert("Upload Failed: " + (data.error || "Unknown error"));
-            }
-        } catch (err) {
-            console.error(err);
-            alert("Error uploading file");
-        } finally {
-            btn.innerText = "🚀 Upload Note";
-            btn.disabled = false;
+};
+async function sendFormData(formData) {
+      try {
+        const res = await fetch('/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+            alert('Upload Successful!');
+            closeModal();
+            showView('notes');
+        } else {
+            alert(`Upload Failed: ${data.error || 'Unknown'}`);
         }
+      } catch (err) {
+          console.error("Upload error:", err);
+          alert('Error uploading file');
+      } finally {
+          document.getElementById('uploadBtn').innerText = '🚀 Save Note';
+          document.getElementById('uploadBtn').disabled = false;
+      }
+  }
+
+  function getThumbnailUrl(fileUrl) {
+    if (!fileUrl) return 'https://via.placeholder.com/300x150?text=No+Preview';
+    let thumb = fileUrl;
+    if (thumb.includes('cloudinary.com')) {
+      thumb = thumb.toLowerCase().endsWith('.pdf')
+        ? thumb.replace('/upload/', '/upload/w_400,pg_1/').replace('.pdf', '.jpg')
+        : thumb.replace('/upload/', '/upload/w_400,c_scale/');
     }
+    return thumb;
+  }
 
-    // --- 3. HELPER FUNCTIONS ---
-    // function getThumbnailUrl(pdfUrl) {
-    //     if (!pdfUrl) return 'https://via.placeholder.com/300x150?text=No+Preview';
-    //     let thumbUrl = pdfUrl;
-    //     if (thumbUrl.includes('cloudinary.com')) {
-    //         thumbUrl = thumbUrl.replace('/upload/', '/upload/w_400,pg_1/');
-    //         thumbUrl = thumbUrl.replace('.pdf', '.jpg');
-    //         thumbUrl = thumbUrl.replace('/raw/', '/image/');
-    //     }
-    //     return thumbUrl;
-    // }
+  // 📚 MERGED NOTE CARD CREATION (With Star Ratings & Your Custom Layout)
+  function createNoteCard(note, isAlreadySaved = false, isSavedViewContext = false) {
+    noteDirectory[note._id] = note; // Critical for Preview functioning
 
-    function getThumbnailUrl(fileUrl) {
-        if (!fileUrl) return 'https://via.placeholder.com/300x150?text=No+Preview';
-        
-        let thumbUrl = fileUrl;
-        
-        if (thumbUrl.includes('cloudinary.com')) {
-            // Check if it's a PDF
-            if (thumbUrl.toLowerCase().endsWith('.pdf')) {
-                thumbUrl = thumbUrl.replace('/upload/', '/upload/w_400,pg_1/');
-                thumbUrl = thumbUrl.replace('.pdf', '.jpg');
-            } else {
-                // If it's an image, just resize it to save bandwidth
-                thumbUrl = thumbUrl.replace('/upload/', '/upload/w_400,c_scale/');
-            }
-        }
-        return thumbUrl;
-    }
-
-    // --- UPDATED HELPER: CREATE CARD ---
-function createNoteCard(note, isAlreadySaved = false, isSavedViewContext = false) {
     const date = new Date(note.createdAt).toLocaleDateString();
     const thumb = getThumbnailUrl(note.fileUrl); 
     
     const card = document.createElement('div');
     card.className = 'note-card';
-    card.onclick = () => openPreview(note);
+    card.onclick = () => openPreview(note._id); // Safely passes the ID
 
     const courseBadge = note.course ? `<span class="badge course">${note.course}</span>` : '';
     const subject = note.subject || 'General';
@@ -142,10 +175,10 @@ function createNoteCard(note, isAlreadySaved = false, isSavedViewContext = false
         ? "color:#f87171; background:rgba(239, 68, 68, 0.2);" 
         : "color:white; background:rgba(0,0,0,0.6);";
 
-    // 👇 NEW: Check if the logged-in user owns this note
+    // Check if the logged-in user owns this note
     const isOwner = currentUserId === note.userId; 
     
-    // 👇 NEW: Only create the HTML for the delete button if they own it
+    // Delete Button Overlay
     const deleteBtnHtml = isOwner && !isSavedViewContext ? `
         <button onclick="event.stopPropagation(); deleteNote('${note._id}')" 
             style="position:absolute; top:10px; left:10px; border:none; padding:5px 10px; border-radius:15px; cursor:pointer; background:rgba(239, 68, 68, 0.9); color:white; font-size:0.8rem; backdrop-filter:blur(4px); transition:0.2s; z-index: 10;">
@@ -153,244 +186,233 @@ function createNoteCard(note, isAlreadySaved = false, isSavedViewContext = false
         </button>
     ` : '';
 
+    // ⭐ Star Rating Logic for the Card
+    const avgRating = note.averageRating ? note.averageRating.toFixed(1) : "New";
+    const stars = note.averageRating ? "⭐" : "🌟";
+
     card.innerHTML = `
         <div style="position:relative;">
-            ${deleteBtnHtml} <img src="${thumb}" class="note-thumb" onerror="this.src='https://via.placeholder.com/300x150?text=PDF'">
+            ${deleteBtnHtml} 
+            <img src="${thumb}" class="note-thumb" onerror="this.src='https://via.placeholder.com/300x150?text=PDF'">
             <button onclick="event.stopPropagation(); toggleSave('${note._id}', this)" 
                 style="position:absolute; top:10px; right:10px; border:none; padding:5px 10px; border-radius:15px; cursor:pointer; font-size:0.8rem; backdrop-filter:blur(4px); transition:0.2s; ${saveBtnStyle}">
                 ${saveBtnText}
             </button>
         </div>
         
-        <div class="card-content">
-            <div class="card-header"><div class="note-title">${note.title}</div></div>
-            <div class="badges"><span class="badge">${subject}</span>${courseBadge}</div>
-            <div class="card-footer">
-                <span class="note-date">${date}</span>
-                <span class="view-btn">View Note →</span>
-                <span class="view-btn" onclick="event.stopPropagation(); startQuiz('${note.fileUrl}')">🧠 Quiz Me</span>
+        <div class="card-content" style="display: flex; flex-direction: column; height: 100%;">
+            <div class="card-header" style="display:flex; justify-content:space-between; align-items:flex-start; gap: 10px;">
+                <div class="note-title" style="margin-bottom: 5px;">${note.title}</div>
+                <span style="background:rgba(255,193,7,0.2); color:#ffc107; padding:2px 8px; border-radius:10px; font-size:0.8rem; font-weight:bold; white-space:nowrap;">
+                    ${avgRating} ${stars}
+                </span>
+            </div>
+            
+            <div class="badges" style="margin-bottom: 10px;">
+                <span class="badge">${subject}</span>${courseBadge}
+            </div>
+            
+            <div class="card-footer" style="margin-top: auto; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center;">
+                <span class="note-date" style="font-size: 0.75rem; color: var(--text-muted);">${date}</span>
+                <span class="view-btn" style="cursor: pointer; font-size: 0.85rem; color: var(--primary); font-weight: 600;">View Note →</span>
+                <span class="view-btn" onclick="event.stopPropagation(); startQuiz('${note.fileUrl}')" style="cursor: pointer; background:rgba(139, 92, 246, 0.2); color: #8b5cf6; padding: 3px 8px; border-radius: 5px;">🧠 Quiz Me</span>
             </div>
         </div>
     `;
     return card;
-}
-    // --- 4. DATA FETCHING ---
-    // --- UPDATED: FETCH NOTES ---
-// --- 4. DATA FETCHING & FILTERING ---
-    
-    // 1. Fetch Notes (Updated to save data globally)
-    async function fetchNotes() {
-        const grid = document.getElementById('notesGrid');
-        grid.innerHTML = '<p>Loading notes...</p>';
-        
-        try {
-            // A. Get Saved IDs first (for the red heart logic)
-            const savedRes = await fetch('/saved-notes');
-            const savedData = await savedRes.json();
-            savedNotesIds.clear();
-            if (savedData.success) {
-                savedData.notes.forEach(note => savedNotesIds.add(note._id));
-            }
+  }
 
-            // B. Get all notes
-            const res = await fetch('/notes'); 
-            const data = await res.json();
-
-            if (data.success && Array.isArray(data.notes) && data.notes.length > 0) {
-                allNotes = data.notes; // Store them in our global variable
-                populateFilterDropdowns(); // Fill the Subject/Course dropdowns dynamically
-                applyFilters(); // Draw the cards on the screen
-            } else {
-                grid.innerHTML = "<p>No notes found. Upload one!</p>";
-                allNotes = [];
-            }
-        } catch (err) { console.error("Error fetching notes:", err); }
-    }
-
-    // 2. Populate Dropdowns dynamically based on user's actual tags
-    function populateFilterDropdowns() {
-        const subjectSelect = document.getElementById('subjectFilter');
-        const courseSelect = document.getElementById('courseFilter');
-        
-        // Extract unique subjects and courses using Sets
-        const subjects = [...new Set(allNotes.map(n => n.subject).filter(Boolean))];
-        const courses = [...new Set(allNotes.map(n => n.course).filter(Boolean))];
-
-        // Reset dropdowns
-        subjectSelect.innerHTML = '<option value="">All Subjects</option>';
-        courseSelect.innerHTML = '<option value="">All Courses</option>';
-
-        // Add options
-        subjects.forEach(s => subjectSelect.innerHTML += `<option value="${s}">${s}</option>`);
-        courses.forEach(c => courseSelect.innerHTML += `<option value="${c}">${c}</option>`);
-    }
-
-    // 3. Apply Filters and Render
-    function applyFilters() {
-        const grid = document.getElementById('notesGrid');
-        
-        // Read current values from the UI
-        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-        const subjectVal = document.getElementById('subjectFilter').value;
-        const courseVal = document.getElementById('courseFilter').value;
-
-        grid.innerHTML = ''; // Clear current grid
-
-        // Filter the global array
-        const filteredNotes = allNotes.filter(note => {
-            // Check if title includes search term
-            const matchSearch = note.title.toLowerCase().includes(searchTerm);
-            // Check if subject matches (or if 'All Subjects' is selected)
-            const matchSubject = subjectVal === "" || note.subject === subjectVal;
-            // Check if course matches (or if 'All Courses' is selected)
-            const matchCourse = courseVal === "" || note.course === courseVal;
-            
-            return matchSearch && matchSubject && matchCourse;
-        });
-
-        // Render the filtered results
-        if (filteredNotes.length > 0) {
-            filteredNotes.forEach(note => {
-                const isSaved = savedNotesIds.has(note._id);
-                grid.appendChild(createNoteCard(note, isSaved, false));
-            });
-        } else {
-            grid.innerHTML = "<p style='color:var(--text-muted);'>No notes match your filters.</p>";
-        }
-    }
-
-    async function fetchSavedNotes() {
-    const grid = document.getElementById('savedGrid');
+  // 🧩 FETCH NOTES
+  async function fetchNotes() {
+    const grid = document.getElementById('notesGrid');
     grid.innerHTML = '<p>Loading...</p>';
     try {
-        const res = await fetch('/saved-notes');
+      const res = await fetch('/notes');
+      const data = await res.json();
+      if (data.success) {
+        allNotes = data.notes;
+        applyFilters();
+      } else { grid.innerHTML = '<p>No notes found.</p>'; }
+    } catch { grid.innerHTML = '<p>Error loading notes.</p>'; }
+  }
+
+  window.applyFilters = function () {
+    const grid = document.getElementById('notesGrid');
+    grid.innerHTML = '';
+    const term = document.getElementById('searchInput')?.value.toLowerCase() || '';
+    const filtered = allNotes.filter(n => n.title.toLowerCase().includes(term));
+    filtered.forEach(note => grid.appendChild(createNoteCard(note)));
+  };
+
+  // ❤️ TOGGLE SAVE
+  window.toggleSave = async function (noteId, btn) {
+    try {
+      const res = await fetch(`/save/${noteId}`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        btn.innerText = data.isSaved ? '❤️ Saved' : '🤍 Save';
+        btn.style.color = data.isSaved ? '#f87171' : 'white';
+        btn.style.background = data.isSaved ? 'rgba(239,68,68,0.2)' : 'rgba(0,0,0,0.6)';
+        if (document.getElementById('saved-view').classList.contains('active')) fetchSavedNotes();
+      }
+    } catch { alert('Error saving note'); }
+  };
+
+  window.fetchSavedNotes = async function () {
+    const grid = document.getElementById('savedGrid');
+    grid.innerHTML = '<p style="color:var(--text-muted);">Loading your collection...</p>';
+    try {
+      const res = await fetch('/saved'); 
+      const data = await res.json();
+      grid.innerHTML = '';
+      if (data.success && data.notes.length > 0) {
+        data.notes.forEach(note => grid.appendChild(createNoteCard(note, true, true)));
+      } else { grid.innerHTML = '<p style="color:var(--text-muted);">No saved notes yet. Go heart some!</p>'; }
+    } catch { grid.innerHTML = '<p style="color:var(--error);">Error loading saved notes.</p>'; }
+  };
+
+  // 🗑️ DELETE NOTE
+  window.deleteNote = async function (id) {
+    if (!confirm('Delete this note?')) return;
+    const res = await fetch(`/notes/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      allNotes = allNotes.filter(n => n._id !== id);
+      applyFilters();
+    } else { alert('Error deleting'); }
+  };
+
+  // ⭐ SUBMIT RATING
+  window.submitRating = async function (score) {
+    if (!currentNoteData) return;
+    try {
+        const res = await fetch(`/notes/${currentNoteData._id}/rate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ score })
+        });
         const data = await res.json();
-        if (data.success && data.notes.length > 0) {
-            grid.innerHTML = ""; 
-            data.notes.forEach(note => {
-                // TRUE for saved, TRUE for savedViewContext
-                grid.appendChild(createNoteCard(note, true, true));
-            });
-        } else {
-            grid.innerHTML = "<p>No saved notes yet. Go explore!</p>";
-        }
-    } catch (err) { console.error(err); }
-}
-// --- DELETE NOTE FUNCTION ---
-    async function deleteNote(noteId) {
-        if (!confirm("Are you sure you want to permanently delete this note?")) {
-            return;
-        }
+        
+        if (data.success) {
+            currentNoteData.averageRating = data.newAverage;
+            const displayObj = document.getElementById('displayRating');
+            if(displayObj) displayObj.innerText = `${data.newAverage.toFixed(1)} ⭐ (${data.totalRatings} ratings)`;
+            alert('Thanks for rating!');
+            fetchNotes(); 
+        } else { alert(data.error); }
+    } catch (err) { alert("Error submitting rating."); }
+  };
 
-        try {
-            const res = await fetch(`/notes/${noteId}`, { method: 'DELETE' });
-            const data = await res.json();
-
-            if (data.success) {
-                // Remove the note from our global array
-                allNotes = allNotes.filter(n => n._id !== noteId);
-                // Redraw the grid without the deleted note
-                applyFilters(); 
-            } else {
-                alert("Error: " + data.error);
-            }
-        } catch (err) {
-            console.error(err);
-            alert("Failed to connect to the server.");
-        }
-    }
-    async function toggleSave(noteId, btnElement) {
-        try {
-            const res = await fetch(`/save/${noteId}`, { method: 'POST' });
-            const data = await res.json();
-            if (data.success) {
-                if (data.isSaved) {
-                    btnElement.innerText = "❤️ Saved";
-                    btnElement.style.background = "rgba(239, 68, 68, 0.2)";
-                    btnElement.style.color = "#f87171";
-                } else {
-                    btnElement.innerText = "🤍 Save";
-                    btnElement.style.background = "rgba(0,0,0,0.6)";
-                    btnElement.style.color = "white";
-                    if(document.getElementById('saved-view').classList.contains('active')) {
-                        btnElement.closest('.note-card').remove();
-                    }
-                }
-            }
-        } catch (err) { alert("Error saving note"); }
+  // 📄 PREVIEW & ACTUAL PDF RENDERING
+  window.openPreview = function (noteId) {
+    const note = noteDirectory[noteId];
+    if (!note) return;
+    currentNoteData = note;
+    document.getElementById('previewTitle').innerText = note.title;
+    document.getElementById('downloadLink').href = note.fileUrl;
+    document.getElementById('summaryContent').innerHTML = `<p style="opacity:0.7;">Click generate to get an AI summary.</p>`;
+    
+    // Update Rating UI if it exists in the header
+    const displayObj = document.getElementById('displayRating');
+    if(displayObj) {
+        if(note.averageRating) displayObj.innerText = `${note.averageRating.toFixed(1)} ⭐ Rated`;
+        else displayObj.innerText = `Rate this note:`;
     }
     
-    // --- 5. PREVIEW & AI SUMMARY ---
-    function openPreview(note) {
-        currentNoteData = note; 
-        document.getElementById('previewTitle').innerText = note.title;
-        document.getElementById('previewDate').innerText = new Date(note.createdAt).toDateString();
-        document.getElementById('downloadLink').href = note.fileUrl;
-        
-        const summaryContent = document.getElementById('summaryContent');
-        const summaryBtn = document.getElementById('summaryBtn');
-        
-        if(summaryContent) summaryContent.innerHTML = '<p style="color:var(--text-muted); font-style:italic;">Click the button below to generate a study summary.</p>';
-        if(summaryBtn) {
-            summaryBtn.disabled = false;
-            summaryBtn.innerText = "✨ Generate Summary";
-        }
-        showView('preview');
+    // Embed the PDF/Image natively
+    const viewer = document.getElementById('docViewerContainer');
+    if (note.fileUrl.toLowerCase().endsWith('.pdf')) {
+        viewer.innerHTML = `<iframe src="${note.fileUrl}" width="100%" height="100%" style="border:none; border-radius:0.5rem;"></iframe>`;
+    } else {
+        viewer.innerHTML = `<img src="${note.fileUrl}" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:0.5rem;">`;
     }
 
-    async function requestSummary() {
-        if (!currentNoteData) return;
-        const summaryContent = document.getElementById('summaryContent');
-        const btn = document.getElementById('summaryBtn');
+    showView('preview');
+  };
 
-        btn.innerText = "Thinking...";
-        btn.disabled = true;
-        summaryContent.innerHTML = `
-            <div style="text-align:center; padding:2rem; color:var(--primary);">
-                <p>Reading your notes...</p>
-                <p style="font-size:0.8rem; color:var(--text-muted);">This may take a few seconds.</p>
-            </div>
-        `;
+  // ✨ GENERATE AI SUMMARY
+  window.requestSummary = async function () {
+    if (!currentNoteData) return;
+    const cont = document.getElementById('summaryContent');
+    const btn = document.getElementById('summaryBtn');
+    btn.disabled = true; btn.innerText = 'Thinking...';
+    cont.innerHTML = '<p>Reading your notes...</p>';
+    try {
+      const res = await fetch('/summarize-url', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileUrl: currentNoteData.fileUrl })
+      });
+      const data = await res.json();
+      cont.innerHTML = data.success ? marked.parse(data.summary) : `<p style="color:red;">${data.error}</p>`;
+      btn.innerText = '✨ Summary';
+    } catch {
+      cont.innerHTML = '<p style="color:red;">Error connecting to AI.</p>';
+    } finally { btn.disabled = false; }
+  };
 
-        try {
-            const res = await fetch('/summarize-url', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fileUrl: currentNoteData.fileUrl })
+  // 🧠 GENERATE AI QUIZ (Works from Preview AND directly from the Card!)
+  window.startQuiz = async function (cardFileUrl = null) {
+    const targetUrl = cardFileUrl || (currentNoteData ? currentNoteData.fileUrl : null);
+    if (!targetUrl) return;
+
+    const modal = document.getElementById('quizModal');
+    const content = document.getElementById('quizContent');
+    const btn = document.getElementById('quizBtn');
+    if(btn) btn.disabled = true;
+    
+    modal.style.display = 'flex';
+    content.innerHTML = '<div style="text-align:center; padding:40px;"><p style="font-size:1.2rem;">🤖 Crafting quiz...</p></div>';
+
+    try {
+        const res = await fetch('/generate-quiz', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileUrl: targetUrl })
+        });
+        const data = await res.json();
+        if (data.success) {
+            content.innerHTML = ''; 
+            data.quiz.forEach((q, qIndex) => {
+                const qDiv = document.createElement('div');
+                qDiv.style.marginBottom = '25px';
+                qDiv.innerHTML = `<h3 style="margin-bottom:15px; font-size:1.1rem;">${qIndex + 1}. ${q.question}</h3>`;
+                q.options.forEach((opt, optIndex) => {
+                    const optBtn = document.createElement('button');
+                    optBtn.className = 'quiz-option';
+                    optBtn.innerText = opt;
+                    optBtn.onclick = function() {
+                        const siblings = qDiv.querySelectorAll('.quiz-option');
+                        siblings.forEach(b => { b.style.pointerEvents = 'none'; b.disabled = true; });
+                        if (optIndex === q.correctIndex) {
+                            this.classList.add('correct'); this.innerText += " ✅ Correct!";
+                        } else {
+                            this.classList.add('wrong'); this.innerText += " ❌ Incorrect";
+                            siblings[q.correctIndex].classList.add('correct');
+                        }
+                    };
+                    qDiv.appendChild(optBtn);
+                });
+                content.appendChild(qDiv);
             });
-            const data = await res.json();
-            if (data.success) {
-                summaryContent.innerHTML = marked.parse(data.summary);
-                btn.innerText = "✨ Regenerate";
-            } else {
-                summaryContent.innerHTML = `<p style="color:red">Error: ${data.error}</p>`;
-                btn.innerText = "Try Again";
-            }
-        } catch (err) {
-            console.error(err);
-            summaryContent.innerHTML = `<p style="color:red">Failed to connect to AI.</p>`;
-            btn.innerText = "Try Again";
-        } finally {
-            btn.disabled = false;
+        } else { content.innerHTML = `<p style="color:var(--error);">Error: ${data.error}</p>`; }
+    } catch (err) { content.innerHTML = `<p style="color:var(--error);">Failed connection.</p>`; } 
+    finally { if(btn) btn.disabled = false; }
+  };
+
+  // 👤 LOAD USER PROFILE
+  async function loadProfile() {
+    try {
+        const res = await fetch('/profile');
+        const data = await res.json();
+        if (data.success) {
+            currentUserId = data.user._id;
+            document.getElementById('p-name').innerText = `${data.user.firstName || ''} ${data.user.lastName || ''}`;
+            document.getElementById('p-email').innerText = data.user.email;
+            document.querySelector('.profile-icon').innerText = data.user.firstName ? data.user.firstName.charAt(0) : '?';
         }
-    }
+    } catch(err) { console.log("Error loading profile", err); }
+  }
 
-    // --- 6. PROFILE ---
-    async function loadProfile() {
-        try {
-            const res = await fetch('/profile');
-            const data = await res.json();
-            if (data.success) {
-                const u = data.user;
-                currentUserId = u._id;
-                document.getElementById('p-name').innerText = `${u.firstName} ${u.lastName}`;
-                document.getElementById('p-email').innerText = u.email;
-                document.getElementById('p-studentId').innerText = u.studentId || "N/A";
-                document.getElementById('p-dept').innerText = u.department || "General";
-                document.querySelector('.profile-icon').innerText = u.firstName.charAt(0);
-            }
-        } catch (err) { console.error(err); }
-    }
-
-    // Initialize
-    loadProfile();
+  // Initialize
+  loadProfile();
+  fetchNotes();
+});
