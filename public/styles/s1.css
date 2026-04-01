@@ -1,0 +1,192 @@
+/* --- 1. GLOBAL STYLES --- */
+:root {
+    --primary: #6366f1;
+    --primary-hover: #4f46e5;
+    --bg-dark: #0f172a;
+    --bg-card: #1e293b;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --badge-bg: rgba(99, 102, 241, 0.2);
+    --badge-text: #818cf8;
+    --success: #10b981;
+    --error: #ef4444;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* --- QUIZ OPTIONS --- */
+.quiz-option {
+    display: block; width: 100%; padding: 12px; margin-bottom: 10px;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; color: white; text-align: left; cursor: pointer; transition: 0.3s;
+}
+.quiz-option:hover { background: rgba(255,255,255,0.1); }
+.quiz-option.correct { background: rgba(16, 185, 129, 0.2); border-color: var(--success); }
+.quiz-option.wrong { background: rgba(239, 68, 68, 0.2); border-color: var(--error); }
+
+/* --- TOAST NOTIFICATIONS --- */
+.notif-toast {
+    position: fixed; bottom: 30px; right: 30px;
+    background: var(--primary); color: white;
+    padding: 16px 24px; border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.3); z-index: 9999;
+    display: flex; align-items: center; gap: 12px; font-weight: 500;
+    transform: translateX(150%);
+    animation: slideInToast 0.5s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: transform 0.4s ease-in;
+}
+
+@keyframes slideInToast {
+    from { transform: translateX(150%); }
+    to { transform: translateX(0); }
+}
+
+/* --- NAVBAR --- */
+.navbar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 1rem 2rem; background-color: rgba(30, 41, 59, 0.8);
+    backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.1);
+    position: sticky; top: 0; z-index: 100;
+}
+.logo { font-size: 1.25rem; font-weight: 700; color: white; }
+.logo span { color: var(--primary); }
+.nav-links { display: flex; gap: 2rem; }
+.nav-item { color: var(--text-muted); text-decoration: none; cursor: pointer; transition: 0.2s; }
+.nav-item:hover, .nav-item.active { color: white; font-weight: 500; }
+.profile-icon {
+    width: 35px; height: 35px; background: var(--primary); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-weight: bold;
+}
+
+/* --- VIEWS --- */
+.view-section {
+    display: none; padding: 2rem; flex: 1; overflow-y: auto;
+    max-width: 1200px; margin: 0 auto; width: 100%;
+    animation: fadeIn 0.3s ease;
+}
+.view-section.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* --- UPLOAD SECTION --- */
+.upload-container {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; height: 80%; text-align: center;
+}
+.upload-box {
+    border: 2px dashed var(--text-muted); background: rgba(255,255,255,0.02);
+    padding: 4rem; border-radius: 1rem; margin-top: 2rem; width: 100%; max-width: 600px;
+    cursor: pointer; transition: 0.2s;
+}
+.upload-box:hover { border-color: var(--primary); background: rgba(99, 102, 241, 0.1); }
+
+/* --- NOTES GRID --- */
+.notes-grid {
+    display: grid; 
+    /* Allows cards to shrink slightly on smaller screens before stacking */
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
+    gap: 1.5rem; margin-top: 1.5rem;
+}
+.note-card {
+    background: var(--bg-card); border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 1rem; cursor: pointer; transition: all 0.2s;
+    display: flex; flex-direction: column; gap: 0; padding: 0;
+    position: relative; overflow: hidden;
+}
+.note-card:hover { transform: translateY(-5px); border-color: var(--primary); box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5); }
+.note-thumb {
+    width: 100%; height: 150px; object-fit: cover;
+    background-color: #2d3748; border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.card-content { padding: 1.5rem; display: flex; flex-direction: column; gap: 0.8rem; flex: 1; }
+.card-header { display: flex; justify-content: space-between; align-items: start; }
+.note-title { font-size: 1.1rem; font-weight: 600; color: #fff; line-height: 1.3; }
+.note-date { font-size: 0.75rem; color: var(--text-muted); }
+.badges { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.badge {
+    font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 20px;
+    background: var(--badge-bg); color: var(--badge-text); font-weight: 500;
+}
+.badge.course { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+.card-footer { margin-top: auto; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; }
+.view-btn { font-size: 0.85rem; color: var(--primary); font-weight: 600; }
+
+/* --- MODAL FOR UPLOAD --- */
+.modal-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(5px);
+    display: none; align-items: center; justify-content: center; z-index: 1000;
+}
+.modal {
+    background: var(--bg-card); padding: 2rem; border-radius: 1rem;
+    width: 90%; max-width: 500px; border: 1px solid rgba(255,255,255,0.1);
+}
+.form-group { margin-bottom: 1rem; }
+.form-group label { display: block; font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--text-muted); }
+.form-input {
+    width: 100%; padding: 0.75rem; background: rgba(0,0,0,0.2);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 0.5rem; color: white;
+}
+.btn-primary {
+    background: var(--primary); color: white; border: none; padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem; font-weight: 600; cursor: pointer; width: 100%; margin-top: 1rem; transition: 0.2s;
+}
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* --- PROFILE --- */
+.profile-card { background: var(--bg-card); padding: 2rem; border-radius: 1rem; max-width: 500px; }
+
+
+/* 📱 --- MOBILE RESPONSIVE MEDIA QUERIES --- 📱 */
+@media (max-width: 768px) {
+    /* Navbar: Stack links and hide profile icon to save space */
+    .navbar { flex-direction: column; padding: 1rem; gap: 1rem; }
+    .nav-links { flex-wrap: wrap; justify-content: center; width: 100%; gap: 1rem; }
+    .profile-icon { display: none; } 
+    
+    /* General Spacing */
+    .view-section { padding: 1rem; }
+    
+    /* Upload Box: Shrink massive padding */
+    .upload-box { padding: 2rem 1rem; }
+    .upload-box h3 { font-size: 1.2rem; }
+    
+    /* Controls Bar: Make search and dropdowns full width */
+    .controls-bar { flex-direction: column; width: 100%; }
+    .controls-bar input, .controls-bar select { width: 100%; }
+
+    /* Note Preview View: Stack the PDF viewer and AI Summary vertically */
+    .preview-content { flex-direction: column !important; gap: 1rem !important; }
+    .doc-viewer { height: 300px !important; width: 100%; }
+    .summary-panel { max-height: none !important; width: 100%; }
+    
+    /* Grid: Force single column on very small phones */
+    .notes-grid { grid-template-columns: 1fr; }
+    
+    /* Modals */
+    .modal { padding: 1.5rem; }
+}
+
+/* ☀️ LIGHT MODE VARIABLES */
+body.light-mode {
+    --bg-dark: #f8fafc;
+    --bg-card: #ffffff;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+}
+body.light-mode .navbar { background-color: rgba(255, 255, 255, 0.9); border-bottom: 1px solid rgba(0,0,0,0.1); }
+body.light-mode .note-card { border: 1px solid rgba(0,0,0,0.1); box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+body.light-mode .modal { border: 1px solid rgba(0,0,0,0.1); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+body.light-mode .form-input { background: rgba(0,0,0,0.05); color: #0f172a; border: 1px solid rgba(0,0,0,0.1); }
+body.light-mode .quiz-option { background: rgba(0,0,0,0.05); color: #0f172a; border-color: rgba(0,0,0,0.1); }
+body.light-mode .quiz-option:hover { background: rgba(0,0,0,0.1); }
+body.light-mode .doc-viewer { border: 1px solid rgba(0,0,0,0.1); background: #f1f5f9; }
+body.light-mode .upload-box { border-color: rgba(0,0,0,0.2); background: rgba(0,0,0,0.02); }
