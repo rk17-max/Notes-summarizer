@@ -5,220 +5,66 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Notes App</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        /* --- 1. GLOBAL STYLES --- */
-        :root {
-            --primary: #6366f1;
-            --primary-hover: #4f46e5;
-            --bg-dark: #0f172a;
-            --bg-card: #1e293b;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --badge-bg: rgba(99, 102, 241, 0.2);
-            --badge-text: #818cf8;
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
-        
-        body {
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-        .quiz-option {
-            display: block;
-            width: 100%;
-            padding: 12px;
-            margin-bottom: 10px;
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 8px;
-            color: white;
-            text-align: left;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-        .quiz-option:hover { background: rgba(255,255,255,0.1); }
-        .quiz-option.correct { background: var(--success); border-color: var(--success); }
-        .quiz-option.wrong { background: var(--error); border-color: var(--error); }
-        /* --- Toast Notification Styles --- */
-        .notif-toast {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            background: var(--primary); /* Uses your existing purple/indigo color */
-            color: white;
-            padding: 16px 24px;
-            border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-            z-index: 9999;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-weight: 500;
-            transform: translateX(150%);
-            animation: slideInToast 0.5s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            transition: transform 0.4s ease-in;
-        }
-
-        @keyframes slideInToast {
-            from { transform: translateX(150%); }
-            to { transform: translateX(0); }
-        }
-
-        /* --- NAVBAR --- */
-        .navbar {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 1rem 2rem; background-color: rgba(30, 41, 59, 0.8);
-            backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.1);
-            position: sticky; top: 0; z-index: 100;
-        }
-        .logo { font-size: 1.25rem; font-weight: 700; color: white; }
-        .logo span { color: var(--primary); }
-        .nav-links { display: flex; gap: 2rem; }
-        .nav-item { color: var(--text-muted); text-decoration: none; cursor: pointer; transition: 0.2s; }
-        .nav-item:hover, .nav-item.active { color: white; font-weight: 500; }
-        .profile-icon {
-            width: 35px; height: 35px; background: var(--primary); border-radius: 50%;
-            display: flex; align-items: center; justify-content: center; font-weight: bold;
-        }
-
-        /* --- VIEWS --- */
-        .view-section {
-            display: none; padding: 2rem; flex: 1; overflow-y: auto;
-            max-width: 1200px; margin: 0 auto; width: 100%;
-            animation: fadeIn 0.3s ease;
-        }
-        .view-section.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* --- UPLOAD SECTION --- */
-        .upload-container {
-            display: flex; flex-direction: column; align-items: center;
-            justify-content: center; height: 80%; text-align: center;
-        }
-        .upload-box {
-            border: 2px dashed var(--text-muted); background: rgba(255,255,255,0.02);
-            padding: 4rem; border-radius: 1rem; margin-top: 2rem; width: 100%; max-width: 600px;
-            cursor: pointer; transition: 0.2s;
-        }
-        .upload-box:hover { border-color: var(--primary); background: rgba(99, 102, 241, 0.1); }
-
-        /* --- NOTES GRID (THEME UPDATE) --- */
-        .notes-grid {
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 1.5rem; margin-top: 1.5rem;
-        }
-        .note-card {
-            background: var(--bg-card); border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 1rem; padding: 1.5rem; cursor: pointer; transition: all 0.2s;
-            display: flex; flex-direction: column; gap: 0.8rem;
-            position: relative; overflow: hidden;
-        }
-        /* Add inside .note-card styles */
-.note-card {
-    /* ... existing styles ... */
-    padding: 0; /* Remove padding so image touches edges */
-    gap: 0;
-}
-
-.note-thumb {
-    width: 100%;
-    height: 150px; /* Fixed height for consistency */
-    object-fit: cover;
-    background-color: #2d3748; /* Placeholder color */
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-}
-
-.card-content {
-    padding: 1.5rem; /* Re-add padding for the text part */
-    display: flex;
-    flex-direction: column;
-    gap: 0.8rem;
-    flex: 1;
-}
-        .note-card:hover { transform: translateY(-5px); border-color: var(--primary); box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5); }
-        
-        .card-header { display: flex; justify-content: space-between; align-items: start; }
-        .note-title { font-size: 1.1rem; font-weight: 600; color: #fff; line-height: 1.3; }
-        .note-date { font-size: 0.75rem; color: var(--text-muted); }
-        
-        .badges { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-        .badge {
-            font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 20px;
-            background: var(--badge-bg); color: var(--badge-text); font-weight: 500;
-        }
-        .badge.course { background: rgba(16, 185, 129, 0.2); color: #34d399; } /* Green for course */
-
-        .note-desc { font-size: 0.9rem; color: var(--text-muted); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        
-        .card-footer { margin-top: auto; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; }
-        .view-btn { font-size: 0.85rem; color: var(--primary); font-weight: 600; }
-
-        /* --- MODAL FOR UPLOAD --- */
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7); backdrop-filter: blur(5px);
-            display: none; align-items: center; justify-content: center; z-index: 1000;
-        }
-        .modal {
-            background: var(--bg-card); padding: 2rem; border-radius: 1rem;
-            width: 90%; max-width: 500px; border: 1px solid rgba(255,255,255,0.1);
-        }
-        .form-group { margin-bottom: 1rem; }
-        .form-group label { display: block; font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--text-muted); }
-        .form-input {
-            width: 100%; padding: 0.75rem; background: rgba(0,0,0,0.2);
-            border: 1px solid rgba(255,255,255,0.1); border-radius: 0.5rem; color: white;
-        }
-        .btn-primary {
-            background: var(--primary); color: white; border: none; padding: 0.75rem 1.5rem;
-            border-radius: 0.5rem; font-weight: 600; cursor: pointer; width: 100%; margin-top: 1rem;
-        }
-        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-
-        /* --- PROFILE --- */
-        .profile-card { background: var(--bg-card); padding: 2rem; border-radius: 1rem; max-width: 500px; }
-    </style>
+    <link rel="stylesheet" href="/styles/s1.css">
+    
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
 
     <nav class="navbar">
         <div class="logo">Note<span>AI</span></div>
         <div class="nav-links">
-    <a onclick="showView('home')" class="nav-item active" id="nav-home">Home</a>
-    <a onclick="showView('notes')" class="nav-item" id="nav-notes">Notes section</a>
-    <a onclick="showView('saved')" class="nav-item" id="nav-saved">Saved Notes</a> 
-    <a onclick="showView('profile')" class="nav-item" id="nav-profile">Profile</a>
-</div>
+            <a onclick="showView('home')" class="nav-item active" id="nav-home">Home</a>
+            <a onclick="showView('notes')" class="nav-item" id="nav-notes">Notes</a>
+            <a onclick="showView('saved')" class="nav-item" id="nav-saved">Saved</a> 
+            <a onclick="showView('profile')" class="nav-item" id="nav-profile">Profile</a>
+            <button id="themeToggle" onclick="toggleTheme()" style="background:none; border:none; font-size:1.5rem; cursor:pointer; margin-left: 10px;">☀️</button>
+        </div>
         <div class="profile-icon">?</div>
     </nav>
 
     <div class="modal-overlay" id="uploadModal">
         <div class="modal">
-            <h2 style="margin-bottom: 1.5rem;">Upload Details</h2>
+            <h2 style="margin-bottom: 1.5rem;">Upload or Write Note</h2>
+            
+            <div style="display:flex; gap:10px; margin-bottom:15px;">
+                <button onclick="switchUploadMode('file')" id="btnModeFile" style="flex:1; padding:10px; background:var(--primary); color:white; border:none; border-radius:5px; cursor:pointer;">Upload PDF</button>
+                <button onclick="switchUploadMode('text')" id="btnModeText" style="flex:1; padding:10px; background:rgba(255,255,255,0.1); color:var(--text-muted); border:none; border-radius:5px; cursor:pointer;">Write Note</button>
+            </div>
+
+            <div id="fileUploadSection" style="margin-bottom: 1rem; text-align: center;">
+                <button class="btn-primary" onclick="document.getElementById('fileInput').click()" style="background:rgba(255,255,255,0.05); border:1px dashed var(--text-muted); color:var(--text-main); margin-bottom:0.5rem;">📎 Choose File</button>
+                <p id="fileNameDisplay" style="font-size: 0.8rem; color: var(--primary);"></p>
+            </div>
+
+            <div id="textUploadSection" style="display:none; margin-bottom:1rem;">
+                <div id="quillEditor" style="height: 150px; background: white; color: black; border-radius: 0 0 5px 5px;"></div>
+            </div>
+
             <div class="form-group">
-                <label>Title</label>
-                <input type="text" id="u-title" class="form-input" placeholder="e.g. Operating Systems Unit 1">
-            </div>
-            <div class="form-group">
-                <label>Description</label>
-                <input type="text" id="u-desc" class="form-input" placeholder="Brief summary...">
-            </div>
-            <div class="form-group" style="display: flex; gap: 1rem;">
-                <div style="flex:1">
-                    <label>Subject</label>
-                    <input type="text" id="u-subject" class="form-input" placeholder="e.g. CS">
-                </div>
-                <div style="flex:1">
-                    <label>Course (Optional)</label>
-                    <input type="text" id="u-course" class="form-input" placeholder="e.g. B.Tech">
-                </div>
-            </div>
-            <p id="fileNameDisplay" style="font-size: 0.8rem; color: var(--primary); margin-bottom: 1rem;"></p>
-            <button class="btn-primary" onclick="submitUpload()" id="uploadBtn">🚀 Upload Note</button>
+    <label>Title</label>
+    <input type="text" id="u-title" class="form-input" placeholder="e.g. Operating Systems Unit 1">
+</div>
+
+<div class="form-group">
+    <label>Description</label>
+    <input type="text" id="u-desc" class="form-input" placeholder="Briefly describe these notes...">
+</div>
+
+<div class="form-group" style="display: flex; gap: 1rem;">
+    <div style="flex:1">
+        <label>Subject</label>
+        <input type="text" id="u-subject" class="form-input" placeholder="e.g. CS">
+    </div>
+    <div style="flex:1">
+        <label>Course</label>
+        <input type="text" id="u-course" class="form-input" placeholder="e.g. B.Tech">
+    </div>
+</div>
+            
+            <button class="btn-primary" onclick="submitUpload()" id="uploadBtn">🚀 Save Note</button>
             <button onclick="closeModal()" style="background:none; border:none; color:var(--text-muted); margin-top:1rem; width:100%; cursor:pointer;">Cancel</button>
         </div>
     </div>
@@ -226,70 +72,66 @@
     <section id="home-view" class="view-section active">
         <div class="upload-container">
             <h1 style="font-size: 2.5rem; margin-bottom: 1rem;">What are we studying today?</h1>
-            <p style="color: var(--text-muted);">Upload your PDF lecture notes to get started.</p>
-            
-            <div class="upload-box" onclick="document.getElementById('fileInput').click()">
+            <p style="color: var(--text-muted);">Upload your PDFs or type out quick notes.</p>
+            <div class="upload-box" onclick="document.getElementById('uploadModal').style.display = 'flex'">
                 <div style="font-size: 3rem; margin-bottom: 1rem;">📄</div>
-                <h3>Click to Upload PDF</h3>
-                <p style="font-size: 0.8rem; color: var(--text-muted);">Max size 10MB</p>
-               <input type="file" id="fileInput" accept=".pdf, image/png, image/jpeg, image/jpg, image/webp" style="display: none;" onchange="handleFileSelect(this)">
+                <h3>Click to Add a Note</h3>
             </div>
+            <input type="file" id="fileInput" accept=".pdf, image/png, image/jpeg, image/jpg, image/webp" style="display: none;" onchange="handleFileSelect(this)">
         </div>
     </section>
 
-    <section id="notes-view" class="view-section active">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-        <h2>My Uploads 📝</h2>
-        <button class="btn-primary" onclick="document.getElementById('fileInput').click()">+ New Note</button>
-    </div>
-
-    <div class="controls-bar" style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
-        <input type="text" id="searchInput" placeholder="🔍 Search notes by title..." onkeyup="applyFilters()" 
-               style="flex: 1; min-width: 200px; padding: 10px 15px; border-radius: 8px; background: var(--bg-card); color: white; border: 1px solid rgba(255,255,255,0.1); outline: none;">
-        
-        <select id="subjectFilter" onchange="applyFilters()" 
-                style="padding: 10px 15px; border-radius: 8px; background: var(--bg-card); color: white; border: 1px solid rgba(255,255,255,0.1); outline: none; cursor: pointer;">
-            <option value="">All Subjects</option>
-        </select>
-        
-        <select id="courseFilter" onchange="applyFilters()" 
-                style="padding: 10px 15px; border-radius: 8px; background: var(--bg-card); color: white; border: 1px solid rgba(255,255,255,0.1); outline: none; cursor: pointer;">
-            <option value="">All Courses</option>
-        </select>
-    </div>
-
-    <div class="notes-grid" id="notesGrid">
+    <section id="notes-view" class="view-section">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+            <h2>My Uploads 📝</h2>
+            <button class="btn-primary" style="width: auto; margin: 0;" onclick="document.getElementById('uploadModal').style.display = 'flex'">+ New Note</button>
         </div>
-</section>
-    </section> 
+        <div class="controls-bar" style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+            <input type="text" id="searchInput" placeholder="🔍 Search notes by title..." onkeyup="applyFilters()" 
+                   style="flex: 1; min-width: 200px; padding: 10px 15px; border-radius: 8px; background: var(--bg-card); color: var(--text-main); border: 1px solid rgba(255,255,255,0.1); outline: none;">
+        </div>
+        <div class="notes-grid" id="notesGrid"></div>
+    </section>
 
     <section id="saved-view" class="view-section">
         <h2>My Saved Collection 📚</h2>
-        <div class="notes-grid" id="savedGrid">
-            <p style="color:var(--text-muted);">Loading saved notes...</p>
-        </div>
+        <div class="notes-grid" id="savedGrid"></div>
     </section>
 
     <section id="preview-view" class="view-section">
-        <button onclick="showView('notes')" style="background:none; border:none; color:var(--text-muted); cursor:pointer; margin-bottom:1rem;">← Back to Notes</button>
-        <div class="preview-header">
-            <h1 id="previewTitle">Note Title</h1>
-            <span id="previewDate" style="color: var(--text-muted);">Date</span>
-        </div>
-        <div class="preview-content" style="display: flex; gap: 2rem; flex-wrap: wrap;">
-            <div class="doc-viewer" style="flex:2; background: #fff; height: 500px; border-radius: 0.5rem; color:#333; display:flex; align-items:center; justify-content:center;">
-                <p>PDF Viewer Coming Soon.<br>
-                <a id="downloadLink" href="#" target="_blank" style="color:blue">Download PDF</a></p>
+        <button onclick="showView('notes')" style="background:none; border:none; color:var(--text-muted); cursor:pointer; margin-bottom:1rem;">← Back</button>
+        
+        <div class="preview-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 1.5rem;">
+            <div>
+                <h1 id="previewTitle">Note Title</h1>
+                <a id="downloadLink" href="#" target="_blank" style="color:var(--primary); font-size:0.9rem; text-decoration:none;">Download File</a>
             </div>
-            <div class="summary-panel" id="summaryPanel" style="flex:1; background: var(--bg-card); padding: 1.5rem; border-radius: 0.5rem; display:flex; flex-direction:column; max-height: 500px;">
-    <h3>AI Actions</h3>
-    
-    <div id="summaryContent" style="flex:1; margin-top:1rem; overflow-y:auto; font-size:0.9rem; color:#e2e8f0; line-height:1.6; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;">
-        <p style="color:var(--text-muted); font-style:italic;">Click the button below to generate a study summary.</p>
-    </div>
+            
+            <div style="background: var(--bg-card); padding: 10px 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center;">
+                <div id="displayRating" style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 5px;">Rate this note:</div>
+                <div style="display: flex; gap: 5px; font-size: 1.5rem; cursor: pointer;">
+                    <span onclick="submitRating(1)" title="1 Star">⭐</span>
+                    <span onclick="submitRating(2)" title="2 Stars">⭐</span>
+                    <span onclick="submitRating(3)" title="3 Stars">⭐</span>
+                    <span onclick="submitRating(4)" title="4 Stars">⭐</span>
+                    <span onclick="submitRating(5)" title="5 Stars">⭐</span>
+                </div>
+            </div>
+        </div>
 
-    <button id="summaryBtn" class="btn-primary" onclick="requestSummary()" style="margin-top: 1rem;">✨ Generate Summary</button>
-</div>
+        <div class="preview-content" style="display: flex; gap: 2rem; flex-wrap: wrap;">
+            <div id="docViewerContainer" class="doc-viewer" style="flex:2; background: #fff; height: 600px; border-radius: 0.5rem; display:flex; align-items:center; justify-content:center; overflow:hidden;"></div>
+            
+            <div class="summary-panel" id="summaryPanel" style="flex:1; background: var(--bg-card); padding: 1.5rem; border-radius: 0.5rem; display:flex; flex-direction:column; max-height: 600px;">
+                <h3>AI Assistant</h3>
+                <div id="summaryContent" style="flex:1; margin-top:1rem; overflow-y:auto; font-size:0.9rem; line-height:1.6; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;">
+                    <p style="color:var(--text-muted); font-style:italic;">Click generate to get a study summary.</p>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 1rem;">
+                    <button id="summaryBtn" class="btn-primary" onclick="requestSummary()" style="flex: 1;">✨ Summary</button>
+                    <button id="quizBtn" class="btn-primary" onclick="startQuiz()" style="flex: 1; background: #8b5cf6;">🧠 Quiz Me</button>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -303,492 +145,22 @@
                     <p id="p-email" style="color: var(--text-muted);">...</p>
                 </div>
             </div>
-            <div style="display: grid; gap: 1rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;">
-                <div><span style="color: var(--text-muted); font-size: 0.9rem;">Student ID</span><p id="p-studentId">...</p></div>
-                <div><span style="color: var(--text-muted); font-size: 0.9rem;">Department</span><p id="p-dept">...</p></div>
-                <button onclick="window.location.href='/logout'" style="
-    margin-top: 20px;
-    width: 100%;
-    padding: 10px;
-    background: rgba(239, 68, 68, 0.2);
-    color: #ef4444;
-    border: 1px solid rgba(239, 68, 68, 0.5);
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 600;
-    transition: 0.3s;
-" onmouseover="this.style.background='rgba(239, 68, 68, 0.4)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.2)'">
-    🚪 Logout
-</button>
-            </div>
+            <button onclick="window.location.href='/logout'" style="margin-top:20px; width:100%; padding:10px; background:rgba(239, 68, 68, 0.2); color:#ef4444; border:1px solid rgba(239, 68, 68, 0.5); border-radius:8px; cursor:pointer; font-weight:600;">🚪 Logout</button>
         </div>
     </section>
-    <script src="/socket.io/socket.io.js"></script>
 
-<script>
-    // --- GLOBAL VARIABLES ---
-    // --- GLOBAL VARIABLES ---
-    // --- SOCKET.IO LISTENER ---
-    const socket = io();
-
-    socket.on('new-note-notification', (data) => {
-        // 1. Create the toast element
-        const toast = document.createElement('div');
-        toast.className = 'notif-toast';
-        
-        // 2. Set the content using the data from the server
-        toast.innerHTML = `
-            <span style="font-size: 1.5rem;">🔔</span>
-            <div>
-                <div style="font-size: 0.85rem; opacity: 0.8;">New Upload at ${data.time}</div>
-                <div><strong>${data.userName}</strong> uploaded <em>"${data.noteTitle}"</em></div>
-            </div>
-        `;
-        
-        // 3. Add it to the screen
-        document.body.appendChild(toast);
-        
-        // 4. Slide it away and remove it after 5 seconds
-        setTimeout(() => { 
-            toast.style.transform = 'translateX(150%)'; 
-            setTimeout(() => toast.remove(), 400); // Wait for the slide animation to finish
-        }, 5000);
-    });
-    let selectedFile = null;
-    let currentNoteData = null; 
-    let allNotes = [];          // ⭐️ NEW: Stores all fetched notes
-    let savedNotesIds = new Set(); // ⭐️ NEW: Stores IDs of saved notes
-    let currentUserId = null
-    // --- 1. NAVIGATION ---
-    function showView(viewName) {
-        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
-        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        
-        document.getElementById(viewName + '-view').classList.add('active');
-        const navLink = document.getElementById('nav-' + viewName);
-        if (navLink) navLink.classList.add('active');
-
-        if (viewName === 'notes') fetchNotes();
-        if (viewName === 'saved') fetchSavedNotes();
-        if (viewName === 'profile') loadProfile();
-    }
-
-    // --- 2. UPLOAD FLOW ---
-    function handleFileSelect(input) {
-        if (input.files && input.files[0]) {
-            selectedFile = input.files[0];
-            document.getElementById('fileNameDisplay').innerText = "Selected: " + selectedFile.name;
-            document.getElementById('uploadModal').style.display = 'flex'; 
-        }
-    }
-
-    function closeModal() {
-        document.getElementById('uploadModal').style.display = 'none';
-        document.getElementById('fileInput').value = ""; 
-    }
-
-    async function submitUpload() {
-        if (!selectedFile) return;
-
-        const btn = document.getElementById('uploadBtn');
-        btn.innerText = "Uploading...";
-        btn.disabled = true;
-
-        const formData = new FormData();
-        formData.append('pdf', selectedFile);
-        formData.append('title', document.getElementById('u-title').value);
-        formData.append('description', document.getElementById('u-desc').value);
-        formData.append('subject', document.getElementById('u-subject').value);
-        formData.append('course', document.getElementById('u-course').value);
-
-        try {
-            const res = await fetch('/upload', { method: 'POST', body: formData });
-            const data = await res.json();
-
-            if (data.success) {
-                alert("Upload Successful!");
-                closeModal();
-                showView('notes'); 
-            } else {
-                alert("Upload Failed: " + (data.error || "Unknown error"));
-            }
-        } catch (err) {
-            console.error(err);
-            alert("Error uploading file");
-        } finally {
-            btn.innerText = "🚀 Upload Note";
-            btn.disabled = false;
-        }
-    }
-
-    // --- 3. HELPER FUNCTIONS ---
-    // function getThumbnailUrl(pdfUrl) {
-    //     if (!pdfUrl) return 'https://via.placeholder.com/300x150?text=No+Preview';
-    //     let thumbUrl = pdfUrl;
-    //     if (thumbUrl.includes('cloudinary.com')) {
-    //         thumbUrl = thumbUrl.replace('/upload/', '/upload/w_400,pg_1/');
-    //         thumbUrl = thumbUrl.replace('.pdf', '.jpg');
-    //         thumbUrl = thumbUrl.replace('/raw/', '/image/');
-    //     }
-    //     return thumbUrl;
-    // }
-
-    function getThumbnailUrl(fileUrl) {
-        if (!fileUrl) return 'https://via.placeholder.com/300x150?text=No+Preview';
-        
-        let thumbUrl = fileUrl;
-        
-        if (thumbUrl.includes('cloudinary.com')) {
-            // Check if it's a PDF
-            if (thumbUrl.toLowerCase().endsWith('.pdf')) {
-                thumbUrl = thumbUrl.replace('/upload/', '/upload/w_400,pg_1/');
-                thumbUrl = thumbUrl.replace('.pdf', '.jpg');
-            } else {
-                // If it's an image, just resize it to save bandwidth
-                thumbUrl = thumbUrl.replace('/upload/', '/upload/w_400,c_scale/');
-            }
-        }
-        return thumbUrl;
-    }
-
-    // --- UPDATED HELPER: CREATE CARD ---
-function createNoteCard(note, isAlreadySaved = false, isSavedViewContext = false) {
-    const date = new Date(note.createdAt).toLocaleDateString();
-    const thumb = getThumbnailUrl(note.fileUrl); 
-    
-    const card = document.createElement('div');
-    card.className = 'note-card';
-    card.onclick = () => openPreview(note);
-
-    const courseBadge = note.course ? `<span class="badge course">${note.course}</span>` : '';
-    const subject = note.subject || 'General';
-
-    const isSaved = isAlreadySaved || isSavedViewContext;
-    const saveBtnText = isSaved ? "❤️ Saved" : "🤍 Save";
-    const saveBtnStyle = isSaved 
-        ? "color:#f87171; background:rgba(239, 68, 68, 0.2);" 
-        : "color:white; background:rgba(0,0,0,0.6);";
-
-    // 👇 NEW: Check if the logged-in user owns this note
-    const isOwner = currentUserId === note.userId; 
-    
-    // 👇 NEW: Only create the HTML for the delete button if they own it
-    const deleteBtnHtml = isOwner && !isSavedViewContext ? `
-        <button onclick="event.stopPropagation(); deleteNote('${note._id}')" 
-            style="position:absolute; top:10px; left:10px; border:none; padding:5px 10px; border-radius:15px; cursor:pointer; background:rgba(239, 68, 68, 0.9); color:white; font-size:0.8rem; backdrop-filter:blur(4px); transition:0.2s; z-index: 10;">
-            🗑️ Delete
-        </button>
-    ` : '';
-
-    card.innerHTML = `
-        <div style="position:relative;">
-            ${deleteBtnHtml} <img src="${thumb}" class="note-thumb" onerror="this.src='https://via.placeholder.com/300x150?text=PDF'">
-            <button onclick="event.stopPropagation(); toggleSave('${note._id}', this)" 
-                style="position:absolute; top:10px; right:10px; border:none; padding:5px 10px; border-radius:15px; cursor:pointer; font-size:0.8rem; backdrop-filter:blur(4px); transition:0.2s; ${saveBtnStyle}">
-                ${saveBtnText}
-            </button>
-        </div>
-        
-        <div class="card-content">
-            <div class="card-header"><div class="note-title">${note.title}</div></div>
-            <div class="badges"><span class="badge">${subject}</span>${courseBadge}</div>
-            <div class="card-footer">
-                <span class="note-date">${date}</span>
-                <span class="view-btn">View Note →</span>
-                <span class="view-btn" onclick="event.stopPropagation(); startQuiz('${note.fileUrl}')">🧠 Quiz Me</span>
-            </div>
-        </div>
-    `;
-    return card;
-}
-    // --- 4. DATA FETCHING ---
-    // --- UPDATED: FETCH NOTES ---
-// --- 4. DATA FETCHING & FILTERING ---
-    
-    // 1. Fetch Notes (Updated to save data globally)
-    async function fetchNotes() {
-        const grid = document.getElementById('notesGrid');
-        grid.innerHTML = '<p>Loading notes...</p>';
-        
-        try {
-            // A. Get Saved IDs first (for the red heart logic)
-            const savedRes = await fetch('/saved-notes');
-            const savedData = await savedRes.json();
-            savedNotesIds.clear();
-            if (savedData.success) {
-                savedData.notes.forEach(note => savedNotesIds.add(note._id));
-            }
-
-            // B. Get all notes
-            const res = await fetch('/notes'); 
-            const data = await res.json();
-
-            if (data.success && Array.isArray(data.notes) && data.notes.length > 0) {
-                allNotes = data.notes; // Store them in our global variable
-                populateFilterDropdowns(); // Fill the Subject/Course dropdowns dynamically
-                applyFilters(); // Draw the cards on the screen
-            } else {
-                grid.innerHTML = "<p>No notes found. Upload one!</p>";
-                allNotes = [];
-            }
-        } catch (err) { console.error("Error fetching notes:", err); }
-    }
-
-    // 2. Populate Dropdowns dynamically based on user's actual tags
-    function populateFilterDropdowns() {
-        const subjectSelect = document.getElementById('subjectFilter');
-        const courseSelect = document.getElementById('courseFilter');
-        
-        // Extract unique subjects and courses using Sets
-        const subjects = [...new Set(allNotes.map(n => n.subject).filter(Boolean))];
-        const courses = [...new Set(allNotes.map(n => n.course).filter(Boolean))];
-
-        // Reset dropdowns
-        subjectSelect.innerHTML = '<option value="">All Subjects</option>';
-        courseSelect.innerHTML = '<option value="">All Courses</option>';
-
-        // Add options
-        subjects.forEach(s => subjectSelect.innerHTML += `<option value="${s}">${s}</option>`);
-        courses.forEach(c => courseSelect.innerHTML += `<option value="${c}">${c}</option>`);
-    }
-
-    // 3. Apply Filters and Render
-    function applyFilters() {
-        const grid = document.getElementById('notesGrid');
-        
-        // Read current values from the UI
-        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-        const subjectVal = document.getElementById('subjectFilter').value;
-        const courseVal = document.getElementById('courseFilter').value;
-
-        grid.innerHTML = ''; // Clear current grid
-
-        // Filter the global array
-        const filteredNotes = allNotes.filter(note => {
-            // Check if title includes search term
-            const matchSearch = note.title.toLowerCase().includes(searchTerm);
-            // Check if subject matches (or if 'All Subjects' is selected)
-            const matchSubject = subjectVal === "" || note.subject === subjectVal;
-            // Check if course matches (or if 'All Courses' is selected)
-            const matchCourse = courseVal === "" || note.course === courseVal;
-            
-            return matchSearch && matchSubject && matchCourse;
-        });
-
-        // Render the filtered results
-        if (filteredNotes.length > 0) {
-            filteredNotes.forEach(note => {
-                const isSaved = savedNotesIds.has(note._id);
-                grid.appendChild(createNoteCard(note, isSaved, false));
-            });
-        } else {
-            grid.innerHTML = "<p style='color:var(--text-muted);'>No notes match your filters.</p>";
-        }
-    }
-
-    async function fetchSavedNotes() {
-    const grid = document.getElementById('savedGrid');
-    grid.innerHTML = '<p>Loading...</p>';
-    try {
-        const res = await fetch('/saved-notes');
-        const data = await res.json();
-        if (data.success && data.notes.length > 0) {
-            grid.innerHTML = ""; 
-            data.notes.forEach(note => {
-                // TRUE for saved, TRUE for savedViewContext
-                grid.appendChild(createNoteCard(note, true, true));
-            });
-        } else {
-            grid.innerHTML = "<p>No saved notes yet. Go explore!</p>";
-        }
-    } catch (err) { console.error(err); }
-}
-// --- DELETE NOTE FUNCTION ---
-    async function deleteNote(noteId) {
-        if (!confirm("Are you sure you want to permanently delete this note?")) {
-            return;
-        }
-
-        try {
-            const res = await fetch(`/notes/${noteId}`, { method: 'DELETE' });
-            const data = await res.json();
-
-            if (data.success) {
-                // Remove the note from our global array
-                allNotes = allNotes.filter(n => n._id !== noteId);
-                // Redraw the grid without the deleted note
-                applyFilters(); 
-            } else {
-                alert("Error: " + data.error);
-            }
-        } catch (err) {
-            console.error(err);
-            alert("Failed to connect to the server.");
-        }
-    }
-    async function toggleSave(noteId, btnElement) {
-        try {
-            const res = await fetch(`/save/${noteId}`, { method: 'POST' });
-            const data = await res.json();
-            if (data.success) {
-                if (data.isSaved) {
-                    btnElement.innerText = "❤️ Saved";
-                    btnElement.style.background = "rgba(239, 68, 68, 0.2)";
-                    btnElement.style.color = "#f87171";
-                } else {
-                    btnElement.innerText = "🤍 Save";
-                    btnElement.style.background = "rgba(0,0,0,0.6)";
-                    btnElement.style.color = "white";
-                    if(document.getElementById('saved-view').classList.contains('active')) {
-                        btnElement.closest('.note-card').remove();
-                    }
-                }
-            }
-        } catch (err) { alert("Error saving note"); }
-    }
-    
-    // --- 5. PREVIEW & AI SUMMARY ---
-    function openPreview(note) {
-        currentNoteData = note; 
-        document.getElementById('previewTitle').innerText = note.title;
-        document.getElementById('previewDate').innerText = new Date(note.createdAt).toDateString();
-        document.getElementById('downloadLink').href = note.fileUrl;
-        
-        const summaryContent = document.getElementById('summaryContent');
-        const summaryBtn = document.getElementById('summaryBtn');
-        
-        if(summaryContent) summaryContent.innerHTML = '<p style="color:var(--text-muted); font-style:italic;">Click the button below to generate a study summary.</p>';
-        if(summaryBtn) {
-            summaryBtn.disabled = false;
-            summaryBtn.innerText = "✨ Generate Summary";
-        }
-        showView('preview');
-    }
-
-    async function requestSummary() {
-        if (!currentNoteData) return;
-        const summaryContent = document.getElementById('summaryContent');
-        const btn = document.getElementById('summaryBtn');
-
-        btn.innerText = "Thinking...";
-        btn.disabled = true;
-        summaryContent.innerHTML = `
-            <div style="text-align:center; padding:2rem; color:var(--primary);">
-                <p>Reading your notes...</p>
-                <p style="font-size:0.8rem; color:var(--text-muted);">This may take a few seconds.</p>
-            </div>
-        `;
-
-        try {
-            const res = await fetch('/summarize-url', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fileUrl: currentNoteData.fileUrl })
-            });
-            const data = await res.json();
-            if (data.success) {
-                summaryContent.innerHTML = marked.parse(data.summary);
-                btn.innerText = "✨ Regenerate";
-            } else {
-                summaryContent.innerHTML = `<p style="color:red">Error: ${data.error}</p>`;
-                btn.innerText = "Try Again";
-            }
-        } catch (err) {
-            console.error(err);
-            summaryContent.innerHTML = `<p style="color:red">Failed to connect to AI.</p>`;
-            btn.innerText = "Try Again";
-        } finally {
-            btn.disabled = false;
-        }
-    }
-
-    // --- 6. PROFILE ---
-    async function loadProfile() {
-        try {
-            const res = await fetch('/profile');
-            const data = await res.json();
-            if (data.success) {
-                const u = data.user;
-                currentUserId = u._id;
-                document.getElementById('p-name').innerText = `${u.firstName} ${u.lastName}`;
-                document.getElementById('p-email').innerText = u.email;
-                document.getElementById('p-studentId').innerText = u.studentId || "N/A";
-                document.getElementById('p-dept').innerText = u.department || "General";
-                document.querySelector('.profile-icon').innerText = u.firstName.charAt(0);
-            }
-        } catch (err) { console.error(err); }
-    }
-
-    // Initialize
-    loadProfile();
-</script>
-<script>
-    async function startQuiz(fileUrl) {
-        const modal = document.getElementById('quizModal');
-        const content = document.getElementById('quizContent');
-        
-        modal.style.display = 'flex';
-        content.innerHTML = '<div style="text-align:center; padding:40px;"><p style="font-size:1.2rem;">🤖 Gemini is reading your notes and crafting a quiz...</p><p style="opacity:0.6; margin-top:10px;">This usually takes 5-10 seconds.</p></div>';
-
-        try {
-            const res = await fetch('/generate-quiz', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fileUrl: fileUrl })
-            });
-            const data = await res.json();
-
-            if (data.success) {
-                content.innerHTML = ''; // Clear loader
-                
-                data.quiz.forEach((q, qIndex) => {
-                    const qDiv = document.createElement('div');
-                    qDiv.style.marginBottom = '25px';
-                    
-                    // Question Text
-                    qDiv.innerHTML = `<h3 style="margin-bottom:15px; font-size:1.1rem;">${qIndex + 1}. ${q.question}</h3>`;
-                    
-                    // Answer Options
-                    q.options.forEach((opt, optIndex) => {
-                        const btn = document.createElement('button');
-                        btn.className = 'quiz-option';
-                        btn.innerText = opt;
-                        
-                        btn.onclick = function() {
-                            // Disable all buttons in this question after guessing
-                            const siblings = qDiv.querySelectorAll('.quiz-option');
-                            siblings.forEach(b => b.style.pointerEvents = 'none');
-
-                            if (optIndex === q.correctIndex) {
-                                this.classList.add('correct');
-                                this.innerText += " ✅ Correct!";
-                            } else {
-                                this.classList.add('wrong');
-                                this.innerText += " ❌ Incorrect";
-                                // Show the correct answer
-                                siblings[q.correctIndex].classList.add('correct');
-                            }
-                        };
-                        qDiv.appendChild(btn);
-                    });
-                    content.appendChild(qDiv);
-                });
-            } else {
-                content.innerHTML = `<p style="color:var(--error);">Error generating quiz: ${data.error}</p>`;
-            }
-        } catch (err) {
-            content.innerHTML = `<p style="color:var(--error);">Failed to connect to the AI server.</p>`;
-        }
-    }
-</script>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<div id="quizModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:10000; justify-content:center; align-items:center;">
+    <div id="quizModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:10000; justify-content:center; align-items:center;">
         <div style="background:var(--bg-card); width:90%; max-width:600px; border-radius:15px; padding:30px; position:relative; max-height:80vh; overflow-y:auto;">
-            <button onclick="document.getElementById('quizModal').style.display='none'" style="position:absolute; top:15px; right:15px; background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;">✖</button>
-            <h2 style="margin-bottom: 20px; color: var(--primary);">🧠 AI Knowledge Check</h2>
-            <div id="quizContent">
-                </div>
+            <button onclick="document.getElementById('quizModal').style.display='none'" style="position:absolute; top:15px; right:15px; background:none; border:none; color:var(--text-muted); font-size:1.5rem; cursor:pointer;">✖</button>
+            <h2 style="margin-bottom: 20px;">🧠 AI Knowledge Check</h2>
+            <div id="quizContent"></div>
         </div>
     </div>
-</body>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="/scripts/s.js"></script>
+    <script src="/scripts/s1.js"></script>
+    
+    </body>
 </html>
