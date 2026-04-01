@@ -1,5 +1,5 @@
 const express = require("express");
-const http = require('http'); // 👈 Add this
+const http = require('http'); 
 const { Server } = require('socket.io');
 const path = require("path");
 const bcrypt = require('bcrypt');
@@ -13,12 +13,13 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "*", // Allows any frontend to connect during development
+        origin: "*", 
         methods: ["GET", "POST"]
     }
 });
-app.set('io', io);
 
+app.set('io', io);
+app.use(express.static("public"));
 const User = require("./models/User");
 const Note = require("./models/Note");
 const databaseconnect = require("./config/dbconfig");
@@ -34,7 +35,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static("public"));
 io.on('connection', (socket) => {
-    console.log('⚡ A student connected:', socket.id);
+    console.log(' A student connected:', socket.id);
 
     socket.on('disconnect', () => {
         console.log('📡 A student disconnected');
@@ -205,7 +206,6 @@ app.post('/upload',auth, upload.single('pdf'), async (req, res) => {
   }
 });
 
-// 👇 ADD THIS SECURE DELETE ROUTE
 app.delete("/notes/:id", auth, async (req, res) => {
     try {
         const noteId = req.params.id;
@@ -215,12 +215,11 @@ app.delete("/notes/:id", auth, async (req, res) => {
             return res.status(404).json({ success: false, error: "Note not found" });
         }
 
-        // 🔒 SECURITY VALIDATION: Is the user deleting it the one who uploaded it?
+       
         if (noteToDelete.userId.toString() !== req.user.id) {
             return res.status(403).json({ success: false, error: "Unauthorized: You can only delete your own notes." });
         }
 
-        // 1. Delete from Cloudinary
         try {
             if (noteToDelete.publicId) {
                 await cloudinary.uploader.destroy(noteToDelete.publicId);
@@ -264,6 +263,46 @@ app.get("/notes", auth, async (req, res) => {
         res.status(500).json({ error: "Server Error" });
     }
 });
+app.post('/notes/:id/rate', auth, async (req, res) => {
+    try {
+        const { score } = req.body;
+        const noteId = req.params.id;
+        const loggedInUserId = req.user._id; 
+
+        const note = await Note.findById(noteId);
+        if (!note) return res.status(404).json({ success: false, error: "Note not found" });
+
+        // 👇 FIX: Changed 'userId' to 'user' to match your Schema
+        const existingRatingIndex = note.ratings.findIndex(r => 
+            r.user && r.user.toString() === loggedInUserId.toString()
+        );
+
+        if (existingRatingIndex >= 0) {
+            // Update existing rating
+            note.ratings[existingRatingIndex].score = score;
+        } else {
+            // 👇 FIX: Use 'user' instead of 'userId' here
+            note.ratings.push({ user: loggedInUserId, score });
+        }
+
+        // Calculate new average
+        if (note.ratings.length > 0) {
+            const totalScore = note.ratings.reduce((acc, curr) => acc + curr.score, 0);
+            note.averageRating = totalScore / note.ratings.length;
+        }
+
+        await note.save();
+
+        res.json({ 
+            success: true, 
+            newAverage: note.averageRating, 
+            totalRatings: note.ratings.length 
+        });
+    } catch (err) {
+        console.error("Rating Error:", err);
+        res.status(500).json({ success: false, error: "Server error while rating" });
+    }
+});
 app.post('/profile',auth, upload.single('avatar'), function (req, res, next) {
   // req.file is the `avatar` file
   // req.body will hold the text fields, if there were any
@@ -275,27 +314,36 @@ app.post("/summarize-url", auth, summaryController.summarizeFromUrl);
 app.post("/generate-quiz", auth, summaryController.generateQuizFromUrl);
 app.post("/save/:noteId", auth, async (req, res) => {
     try {
-        const user = await User.findById(req.user.id);
+        // Use req.user._id to ensure we have the correct database ID
+        const user = await User.findById(req.user._id);
         const noteId = req.params.noteId;
 
-        // Check if already saved
-        if (user.savedNotes.includes(noteId)) {
-            user.savedNotes.pull(noteId); // Remove if exists
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        // Convert the array of ObjectIDs to strings so the .includes() check works perfectly
+        const isAlreadySaved = user.savedNotes.some(id => id.toString() === noteId);
+
+        if (isAlreadySaved) {
+            // Remove the note if it's already in the collection
+            user.savedNotes = user.savedNotes.filter(id => id.toString() !== noteId);
             await user.save();
             return res.json({ success: true, isSaved: false, message: "Removed from collection" });
         } else {
-            user.savedNotes.push(noteId); // Add if new
+            // Add the note if it's new
+            user.savedNotes.push(noteId);
             await user.save();
             return res.json({ success: true, isSaved: true, message: "Added to collection" });
         }
     } catch (err) {
-        console.error(err);
+        console.error("Save Error:", err);
         res.status(500).json({ error: "Server Error" });
     }
 });
 
 
-app.get("/saved-notes", auth, async (req, res) => {
+app.get("/saved", auth, async (req, res) => {
     try {
        
         const user = await User.findById(req.user.id).populate('savedNotes');
@@ -307,6 +355,16 @@ app.get("/saved-notes", auth, async (req, res) => {
         res.status(500).json({ error: "Server Error" });
     }
 });
-server.listen(3000, () => {
-  console.log("🚀 Server & Socket.io running at port 3000");
+
+
+app.get("/logout", (req, res) => {
+    
+    res.clearCookie("token"); 
+    
+ 
+    res.redirect("/login"); 
+});
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`🚀 Server & Socket.io running at port ${PORT}`);
 });
