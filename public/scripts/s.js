@@ -395,7 +395,18 @@ async function sendFormData(formData) {
             });
         } else { content.innerHTML = `<p style="color:var(--error);">Error: ${data.error}</p>`; }
     } catch (err) { content.innerHTML = `<p style="color:var(--error);">Failed connection.</p>`; } 
-    finally { if(btn) btn.disabled = false; }
+    finally { 
+        if (btn) {
+            // Change the text to show it's on cooldown
+            btn.innerText = "⏳ Cooldown...";
+            
+            // Wait 5000 milliseconds (5 seconds) before turning it back on
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.innerText = "🧠 Quiz Me"; // Or whatever your original button text was
+            }, 5000);
+        }
+    }
   };
 
   // 👤 LOAD USER PROFILE
