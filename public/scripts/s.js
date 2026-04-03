@@ -215,6 +215,9 @@ async function sendFormData(formData) {
             <div class="card-footer" style="margin-top: auto; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center;">
                 <span class="note-date" style="font-size: 0.75rem; color: var(--text-muted);">${date}</span>
                 <span class="view-btn" style="cursor: pointer; font-size: 0.85rem; color: var(--primary); font-weight: 600;">View Note →</span>
+                <button class="action-btn share-btn" onclick="shareNote('${note._id}')">
+    🔗 Share
+</button>
                 <span class="view-btn" onclick="event.stopPropagation(); startQuiz('${note.fileUrl}')" style="cursor: pointer; background:rgba(139, 92, 246, 0.2); color: #8b5cf6; padding: 3px 8px; border-radius: 5px;">🧠 Quiz Me</span>
             </div>
         </div>
@@ -408,6 +411,13 @@ async function sendFormData(formData) {
         }
     }
   };
+  window.shareNote = function(noteId) {
+    const shareUrl = `${window.location.origin}/share/${noteId}`;
+    
+    navigator.clipboard.writeText(shareUrl).then(() => {
+        alert("Share link copied to clipboard! Paste it in WhatsApp to see the preview.");
+    });
+};
 
   // 👤 LOAD USER PROFILE
   async function loadProfile() {
@@ -423,7 +433,22 @@ async function sendFormData(formData) {
     } catch(err) { console.log("Error loading profile", err); }
   }
 
+
   // Initialize
   loadProfile();
+
   fetchNotes();
+  const urlParams = new URLSearchParams(window.location.search);
+    const sharedNoteId = urlParams.get('note');
+
+    if (sharedNoteId) {
+        // We wait 1.5s to give 'fetchNotes' time to download the notes into noteDirectory
+        setTimeout(() => {
+            if (typeof openPreview === 'function') {
+                console.log("🔍 Auto-opening shared note:", sharedNoteId);
+                openPreview(sharedNoteId);
+            }
+        }, 1500);
+    }
+
 });
