@@ -15,11 +15,13 @@
     "dotenv": "^17.2.4",
     "email-validator": "^2.0.4",
     "express": "^5.2.1",
+    "groq-sdk": "^1.1.2",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.1.5",
     "multer": "^2.0.2",
     "multer-storage-cloudinary": "^4.0.0",
     "nodemon": "^3.1.11",
+    "pdf-parse": "^1.1.1",
     "socket.io": "^4.8.3"
   }
 }
