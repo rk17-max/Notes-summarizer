@@ -46,9 +46,13 @@ app.use((req,res,next)=>{
   next()
 })
 
+
 app.get("/", (req, res) => {
-   res.sendFile(path.join(__dirname, "views", "login.html"));
-  
+    // If the user has a token cookie, send them to home, otherwise login
+    if (req.cookies && req.cookies.token) {
+        return res.redirect("/home");
+    }
+    res.sendFile(path.join(__dirname, "views", "login.html"));
 });
 
 
@@ -317,6 +321,7 @@ app.post("/save/:noteId", auth, async (req, res) => {
         // Use req.user._id to ensure we have the correct database ID
         const user = await User.findById(req.user._id);
         const noteId = req.params.noteId;
+        console.log(noteId)
 
         if (!user) {
             return res.status(404).json({ error: "User not found" });
@@ -355,7 +360,53 @@ app.get("/saved", auth, async (req, res) => {
         res.status(500).json({ error: "Server Error" });
     }
 });
+// Route to view a specific shared note
+app.get("/share/:noteId", async (req, res) => {
+    try {
+        const note = await Note.findById(req.params.noteId);
+        if (!note) return res.status(404).send("Note not found");
 
+        // Use the note's title and its Cloudinary URL for the preview
+        const title = note.title || "Shared Note";
+        const description = "Check out these study notes on Final Notes!";
+        const imageUrl = note.fileUrl; // This is your Cloudinary link
+
+        // Sending a simple HTML string with Meta Tags
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>${title}</title>
+                
+                <meta property="og:type" content="website">
+                <meta property="og:url" content="https://notes-summarizer-mm2f.onrender.com/share/${req.params.noteId}">
+                <meta property="og:title" content="${title}">
+                <meta property="og:description" content="${description}">
+                <meta property="og:image" content="${imageUrl}">
+
+                <meta property="twitter:card" content="summary_large_image">
+                <meta property="twitter:title" content="${title}">
+                <meta property="twitter:image" content="${imageUrl}">
+
+               <script>
+    // Detect if we should go to home (logged in) or root (which now redirects smartly)
+    // We use a small delay so WhatsApp can read the meta tags first
+    setTimeout(() => {
+        const noteId = "${req.params.noteId}";
+        // Redirect to home and pass the noteId so your frontend can open it automatically
+        window.location.href = "/home?note=" + noteId;
+    }, 1000);
+</script>
+            </head>
+            <body>
+                <p>Redirecting to note...</p>
+            </body>
+            </html>
+        `);
+    } catch (err) {
+        res.status(500).send("Server Error");
+    }
+});
 
 app.get("/logout", (req, res) => {
     
